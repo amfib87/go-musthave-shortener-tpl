@@ -17,14 +17,14 @@ func InitMap() {
 func GetShortURL(key string) string {
 	_, ok := mapURL[key]
 	if !ok {
-		shortURL := generateShortId()
+		shortURL := generateShortID()
 		mapURL[key] = shortURL
 		return shortURL
 	}
 	return ""
 }
 
-func generateShortId() string {
+func generateShortID() string {
 	b := make([]byte, 8)
 	for i := range b {
 		b[i] = model.Letters[rand.Intn(len(model.Letters))]
