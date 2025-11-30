@@ -30,8 +30,9 @@ func TestMainPostHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		res, _ := testRequest(t, ts, tt.method, tt.url, ts.URL)
+		defer res.Body.Close()
 
-		assert.Equal(t, tt.expectedCode, res.StatusCode, "Код ответа не совпадает с ожидаемым")
+		assert.Equal(t, tt.expectedCode, res.StatusCode, "код ответа не совпадает с ожидаемым")
 	}
 }
 
@@ -42,7 +43,8 @@ func TestIDGetHandler(t *testing.T) {
 	url := "https://practicum.yandex.ru/"
 
 	res, shortURL := testRequest(t, ts, http.MethodPost, url, ts.URL)
-	assert.Equal(t, http.StatusCreated, res.StatusCode, "Код ответа не совпадает с ожидаемым")
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusCreated, res.StatusCode, "код ответа не совпадает с ожидаемым")
 
 	tests := []struct {
 		name         string // description of this test case
@@ -62,12 +64,13 @@ func TestIDGetHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res, _ := testRequest(t, ts, tt.method, "", tt.url)
-		loc := res.Header.Get("Location")
+		resGet, _ := testRequest(t, ts, tt.method, "", tt.url)
+		defer resGet.Body.Close()
+		loc := resGet.Header.Get("Location")
 
-		assert.Equal(t, tt.expectedCode, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-		if res.StatusCode == http.StatusTemporaryRedirect {
-			assert.Equal(t, url, loc, "URL определен неверно")
+		assert.Equal(t, tt.expectedCode, resGet.StatusCode, "код ответа не совпадает с ожидаемым")
+		if resGet.StatusCode == http.StatusTemporaryRedirect {
+			assert.Equal(t, url, loc, "url определен неверно")
 		}
 	}
 }

@@ -35,7 +35,7 @@ func TestMainPostHandler(t *testing.T) {
 
 			MainPostHandler(res, req)
 
-			assert.Equal(t, tt.expectedCode, res.Code, "Код ответа не совпадает с ожидаемым")
+			assert.Equal(t, tt.expectedCode, res.Code, "код ответа не совпадает с ожидаемым")
 		})
 	}
 }
@@ -46,7 +46,7 @@ func TestIDGetHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
 
 	MainPostHandler(res, req)
-	assert.Equal(t, http.StatusCreated, res.Code, "Код ответа не совпадает с ожидаемым")
+	assert.Equal(t, http.StatusCreated, res.Code, "код ответа не совпадает с ожидаемым")
 
 	shortURL := res.Body.String()
 
@@ -78,9 +78,9 @@ func TestIDGetHandler(t *testing.T) {
 			IDGetHandler(res, req)
 			loc := res.Header().Get("Location")
 
-			assert.Equal(t, tt.expectedCode, res.Code, "Код ответа не совпадает с ожидаемым")
+			assert.Equal(t, tt.expectedCode, res.Code, "код ответа не совпадает с ожидаемым")
 			if res.Code == http.StatusTemporaryRedirect {
-				assert.Equal(t, url, loc, "URL определен неверно")
+				assert.Equal(t, url, loc, "url определен неверно")
 			}
 		})
 	}

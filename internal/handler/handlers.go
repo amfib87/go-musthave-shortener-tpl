@@ -33,17 +33,17 @@ func MainPostHandler(res http.ResponseWriter, req *http.Request) {
 
 func IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
-		http.Error(res, "Тип запроса некорректный", http.StatusMethodNotAllowed)
+		http.Error(res, "тип запроса некорректный", http.StatusMethodNotAllowed)
 		return
 	}
 
 	if req.URL.Path == "" {
-		http.Error(res, "ID is empty", http.StatusBadRequest)
+		http.Error(res, "id is empty", http.StatusBadRequest)
 		return
 	}
 	ID := req.URL.Path[1:]
 	if ID == "" {
-		http.Error(res, "ID is required", http.StatusBadRequest)
+		http.Error(res, "id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -53,7 +53,7 @@ func IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if fullURL == "" {
-		http.Error(res, "ID не найдено", http.StatusNotFound)
+		http.Error(res, "id не найдено", http.StatusNotFound)
 		return
 	}
 

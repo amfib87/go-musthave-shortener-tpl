@@ -32,7 +32,7 @@ func generateShortID() string {
 func GetFullURL(key string) (val string, err error) {
 	value, ok := mapURL[key]
 	if !ok {
-		return "", fmt.Errorf("Id отсутствует")
+		return "", fmt.Errorf("id отсутствует")
 	}
 	return value, nil
 }
