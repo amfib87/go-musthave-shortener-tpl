@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"math/rand"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
@@ -15,13 +16,9 @@ func InitMap() {
 }
 
 func GetShortURL(key string) string {
-	_, ok := mapURL[key]
-	if !ok {
-		shortURL := generateShortID()
-		mapURL[key] = shortURL
-		return shortURL
-	}
-	return ""
+	shortURL := generateShortID()
+	mapURL[shortURL] = key
+	return shortURL
 }
 
 func generateShortID() string {
@@ -32,11 +29,10 @@ func generateShortID() string {
 	return string(b)
 }
 
-func GetFullURL(id string) string {
-	for key, val := range mapURL {
-		if val == id {
-			return key
-		}
+func GetFullURL(key string) (val string, err error) {
+	value, ok := mapURL[key]
+	if !ok {
+		return "", fmt.Errorf("Id отсутствует")
 	}
-	return ""
+	return value, nil
 }

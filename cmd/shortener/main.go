@@ -3,16 +3,12 @@ package main
 import (
 	"net/http"
 
-	"github.com/amfib87/go-musthave-shortener-tpl/internal/handler"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/router"
 )
 
 func main() {
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /", handler.MainPostHandler)
-	mux.HandleFunc("GET /", handler.IDGetHandler)
-
-	err := http.ListenAndServe(`:8080`, mux)
+	err := http.ListenAndServe(":8080", router.Init())
 	if err != nil {
 		panic(err)
 	}

@@ -24,9 +24,11 @@ func MainPostHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	shortURL := service.GetShortURL(URL)
+	// fmt.Println("URL, shortURL", URL, shortURL)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
-	res.Write([]byte("http://localhost:8080/" + shortURL))
+	// res.Write([]byte("http://localhost:8080/" + shortURL))
+	res.Write([]byte("http://" + req.Host + "/" + shortURL))
 }
 
 func IDGetHandler(res http.ResponseWriter, req *http.Request) {
@@ -40,14 +42,22 @@ func IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	ID := req.URL.Path[1:]
-	fullURL := service.GetFullURL(ID)
-
-	if fullURL == "" {
-		http.Error(res, "URL не найден", http.StatusNotFound)
+	if ID == "" {
+		http.Error(res, "ID is required", http.StatusBadRequest)
 		return
 	}
 
-	res.Header().Set("Location", fullURL)
+	fullURL, err := service.GetFullURL(ID)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusNotFound)
+		return
+	}
+	if fullURL == "" {
+		http.Error(res, "ID не найдено", http.StatusNotFound)
+		return
+	}
 
+	res.Header().Set("Content-Type", "text/plain")
+	res.Header().Set("Location", fullURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
