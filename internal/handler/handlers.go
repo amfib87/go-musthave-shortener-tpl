@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 )
 
@@ -24,11 +25,17 @@ func MainPostHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	shortURL := service.GetShortURL(URL)
-	// fmt.Println("URL, shortURL", URL, shortURL)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
 	// res.Write([]byte("http://localhost:8080/" + shortURL))
-	res.Write([]byte("http://" + req.Host + "/" + shortURL))
+
+	var serv string
+	if config.Cnfg.AddrForURL == "" {
+		serv = "http://" + req.Host + "/" + shortURL
+	} else {
+		serv = config.Cnfg.AddrForURL + "/" + shortURL
+	}
+	res.Write([]byte(serv))
 }
 
 func IDGetHandler(res http.ResponseWriter, req *http.Request) {
