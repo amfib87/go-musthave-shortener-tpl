@@ -22,7 +22,7 @@ func Init(cfg *config.Cnfg) *Router {
 	h := handler.NewHandler(cfg)
 
 	// Регистрируем маршруты
-	r.chi.Get("/{id}", h.MainPostHandler)
+	r.chi.Get("/{id}", h.IDGetHandler)
 	r.chi.Post("/", h.MainPostHandler)
 
 	return r

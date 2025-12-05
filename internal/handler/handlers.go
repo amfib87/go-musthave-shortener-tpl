@@ -32,7 +32,7 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 
 	URL := string(body)
 	if URL == "" {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		http.Error(res, "url is empty", http.StatusBadRequest)
 		return
 	}
 
@@ -70,6 +70,7 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	ID := req.URL.Path[1:]
 	if ID == "" {
+		log.Println("ID is empty")
 		http.Error(res, "id is required", http.StatusBadRequest)
 		return
 	}
