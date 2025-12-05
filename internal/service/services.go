@@ -7,30 +7,33 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 )
 
-var mapURL model.StringMap
-
-func InitMap() {
-	if mapURL == nil {
-		mapURL = make(model.StringMap)
-	}
+func InitMap() *model.StringMap {
+	m := make(model.StringMap)
+	return &m
 }
 
-func GetShortURL(key string) string {
+func GetShortURL(key string, m *model.StringMap) string {
 	shortURL := generateShortID()
-	mapURL[shortURL] = key
+	_, exists := (*m)[shortURL]
+	if !exists {
+		(*m)[shortURL] = key
+	}
+
 	return shortURL
 }
 
 func generateShortID() string {
+	const Letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 	b := make([]byte, 8)
 	for i := range b {
-		b[i] = model.Letters[rand.Intn(len(model.Letters))]
+		b[i] = Letters[rand.Intn(len(Letters))]
 	}
 	return string(b)
 }
 
-func GetFullURL(key string) (val string, err error) {
-	value, ok := mapURL[key]
+func GetFullURL(key string, m *model.StringMap) (val string, err error) {
+	value, ok := (*m)[key]
 	if !ok {
 		return "", fmt.Errorf("id отсутствует")
 	}

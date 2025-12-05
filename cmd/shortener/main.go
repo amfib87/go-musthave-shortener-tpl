@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
@@ -9,10 +10,10 @@ import (
 
 func main() {
 	// обрабатываем аргументы командной строки
-	config.ParseFlags()
+	cfg := config.NewConfig()
+	config.ParseFlags(cfg)
 
-	err := http.ListenAndServe(config.Cnfg.ServRunAddr, router.Init())
-	if err != nil {
-		panic(err)
-	}
+	// Инициализируем маршрутизатор с конфигурацией
+	router := router.Init(cfg)
+	log.Fatal(http.ListenAndServe(cfg.ServRunAddr, router))
 }

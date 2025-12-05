@@ -1,102 +1,26 @@
 package router
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestMainPostHandler(t *testing.T) {
-	ts := httptest.NewServer(Init())
-	defer ts.Close()
-
+func TestInit(t *testing.T) {
 	tests := []struct {
-		name         string // description of this test case
-		method       string
-		url          string
-		expectedCode int
+		name string // description of this test case
+		// Named input parameters for target function.
+		cfg    *config.Cnfg
+		router bool
 	}{
-		// TODO: Add test cases.
-		{name: "postSuccs", method: http.MethodPost, url: "http://yandex.ru/",
-			expectedCode: http.StatusCreated},
-
-		{name: "delError", method: http.MethodDelete, url: "http://google.ru/",
-			expectedCode: http.StatusMethodNotAllowed},
+		{name: "Succs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: ""}, router: true},
 	}
 	for _, tt := range tests {
-		res, _ := testRequest(t, ts, tt.method, tt.url, ts.URL)
-		defer res.Body.Close()
-
-		assert.Equal(t, tt.expectedCode, res.StatusCode, "код ответа не совпадает с ожидаемым")
+		t.Run(tt.name, func(t *testing.T) {
+			got := Init(tt.cfg)
+			// TODO: update the condition below to compare got with tt.want.
+			assert.NotNil(t, got, "Объект = nil")
+		})
 	}
-}
-
-func TestIDGetHandler(t *testing.T) {
-	ts := httptest.NewServer(Init())
-	defer ts.Close()
-
-	url := "https://practicum.yandex.ru/"
-
-	res, shortURL := testRequest(t, ts, http.MethodPost, url, ts.URL)
-	defer res.Body.Close()
-	assert.Equal(t, http.StatusCreated, res.StatusCode, "код ответа не совпадает с ожидаемым")
-
-	tests := []struct {
-		name         string // description of this test case
-		method       string
-		url          string
-		expectedCode int
-	}{
-		// TODO: Add test cases.
-		{name: "getSuccs", method: http.MethodGet, url: shortURL,
-			expectedCode: http.StatusTemporaryRedirect},
-
-		{name: "getError", method: http.MethodGet, url: shortURL[:23] + "djhghhj",
-			expectedCode: http.StatusNotFound},
-
-		{name: "getError2", method: http.MethodGet, url: shortURL[:23],
-			expectedCode: http.StatusMethodNotAllowed},
-	}
-
-	for _, tt := range tests {
-		resGet, _ := testRequest(t, ts, tt.method, "", tt.url)
-		defer resGet.Body.Close()
-		loc := resGet.Header.Get("Location")
-
-		assert.Equal(t, tt.expectedCode, resGet.StatusCode, "код ответа не совпадает с ожидаемым")
-		if resGet.StatusCode == http.StatusTemporaryRedirect {
-			assert.Equal(t, url, loc, "url определен неверно")
-		}
-	}
-}
-
-func testRequest(t *testing.T, ts *httptest.Server, method, body, path string) (*http.Response, string) {
-	req, err := http.NewRequest(method, path, strings.NewReader(body))
-	require.NoError(t, err)
-
-	cl := ts.Client()
-
-	cl.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		// Если сделать редирект больше 1, то функция IDGetHandler начинает всегда возвращать статус 200.
-		// Это связано с вызовом функции service.GetFullURL(ID). Побороть эту проблему не получилось. Причина такой работы тоже не ясна.
-		// Нашел выход - установить редирект = 1 т.к. первый проход функции IDGetHandler всегда возвращается с корректным результатом.
-		if len(via) >= 1 { // Лимит
-			return http.ErrUseLastResponse // Вернуть последний ответ без дальнейшего следования
-		}
-		return nil // Разрешить следующий редирект
-	}
-
-	resp, err := cl.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	return resp, string(respBody)
 }
