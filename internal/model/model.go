@@ -17,16 +17,16 @@ func (m *StringMap) InsertShortURL(key, shortURL string) error {
 	m.Mu.Lock()
 	defer m.Mu.Unlock()
 
-	if _, exists := (*&m.Data)[shortURL]; exists {
+	if _, exists := (m.Data)[shortURL]; exists {
 		return ErrKeyExists
 	}
 
-	(*&m.Data)[shortURL] = key
+	(m.Data)[shortURL] = key
 	return nil
 }
 
 func (m *StringMap) GetFullURL(key string) (val string, err error) {
-	value, ok := (*&m.Data)[key]
+	value, ok := (m.Data)[key]
 	if !ok {
 		return "", fmt.Errorf("id отсутствует")
 	}
