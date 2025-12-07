@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 
@@ -8,18 +9,30 @@ import (
 )
 
 func InitMap() *model.StringMap {
-	m := make(model.StringMap)
-	return &m
+	return &model.StringMap{
+		Data: make(map[string]string),
+	}
 }
 
-func GetShortURL(key string, m *model.StringMap) string {
-	shortURL := generateShortID()
-	_, exists := (*m)[shortURL]
-	if !exists {
-		(*m)[shortURL] = key
+func GetShortURL(key string, m *model.StringMap) (string, error) {
+	const maxRetries = 5
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		shortURL := generateShortID()
+
+		err := m.InsertShortURL(key, shortURL)
+		if err == nil {
+			return shortURL, nil
+		}
+
+		if errors.Is(err, model.ErrKeyExists) {
+			continue
+		}
+
+		return "", fmt.Errorf("unexpected error on insert")
 	}
 
-	return shortURL
+	return "", fmt.Errorf("failed to compose unique short URL after %d attempts", maxRetries)
 }
 
 func generateShortID() string {
@@ -30,12 +43,4 @@ func generateShortID() string {
 		b[i] = Letters[rand.Intn(len(Letters))]
 	}
 	return string(b)
-}
-
-func GetFullURL(key string, m *model.StringMap) (val string, err error) {
-	value, ok := (*m)[key]
-	if !ok {
-		return "", fmt.Errorf("id отсутствует")
-	}
-	return value, nil
 }

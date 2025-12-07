@@ -36,7 +36,13 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortURL := service.GetShortURL(URL, h.mapURL)
+	shortURL, err := service.GetShortURL(URL, h.mapURL)
+	if err != nil {
+		log.Printf("error GetShortURL")
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
 
@@ -44,7 +50,7 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 	if h.cfg.AddrForURL == "" {
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
-			log.Printf("500 Internal Error: %v", err)
+			log.Printf("failed to compose the shortened URL: %v", err)
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -75,7 +81,7 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fullURL, err := service.GetFullURL(ID, h.mapURL)
+	fullURL, err := h.mapURL.GetFullURL(ID)
 	if err != nil {
 		log.Printf("500 Internal Error: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
