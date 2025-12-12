@@ -38,7 +38,7 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 
 	shortURL, err := service.GetShortURL(URL, h.mapURL)
 	if err != nil {
-		log.Printf("error GetShortURL")
+		log.Printf("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
