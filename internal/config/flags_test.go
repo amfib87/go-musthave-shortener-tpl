@@ -38,7 +38,7 @@ func TestParseFlags(t *testing.T) {
 			name:           "no flags, no env vars",
 			envVars:        map[string]string{},
 			args:           []string{},
-			expServRunAddr: "",
+			expServRunAddr: ":8080",
 			expAddrForURL:  "",
 		},
 		{
@@ -83,7 +83,7 @@ func TestParseFlags(t *testing.T) {
 				"BASE_URL": "/55555555",
 			},
 			args:           []string{},
-			expServRunAddr: "",
+			expServRunAddr: ":8080",
 			expAddrForURL:  "/55555555",
 		},
 	}
