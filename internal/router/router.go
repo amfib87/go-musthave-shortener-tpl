@@ -5,6 +5,7 @@ import (
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/handler"
+	log "github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/go-chi/chi"
 )
 
@@ -22,9 +23,8 @@ func Init(cfg *config.Cnfg) *Router {
 	h := handler.NewHandler(cfg)
 
 	// Регистрируем маршруты
-	r.chi.Get("/{id}", h.IDGetHandler)
-	r.chi.Post("/", h.MainPostHandler)
-
+	r.chi.Get("/{id}", log.RequestLogger(h.IDGetHandler))
+	r.chi.Post("/", log.RequestLogger(h.MainPostHandler))
 	return r
 }
 

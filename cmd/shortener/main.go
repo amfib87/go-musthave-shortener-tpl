@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/router"
 )
 
@@ -15,5 +16,10 @@ func main() {
 
 	// Инициализируем маршрутизатор с конфигурацией
 	router := router.Init(cfg)
+
+	if err := logger.Initialize("Info"); err != nil {
+		log.Fatal(err.Error())
+	}
+
 	log.Fatal(http.ListenAndServe(cfg.ServRunAddr, router))
 }
