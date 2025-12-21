@@ -25,6 +25,7 @@ func Init(cfg *config.Cnfg) *Router {
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", log.RequestLogger(h.IDGetHandler))
 	r.chi.Post("/", log.RequestLogger(h.MainPostHandler))
+	r.chi.Post("/{api}/{shorten}", log.RequestLogger(h.PostShortenHandler))
 	return r
 }
 

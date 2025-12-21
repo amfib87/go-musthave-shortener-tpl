@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -95,4 +97,69 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "text/plain")
 	res.Header().Set("Location", fullURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h *Handler) PostShortenHandler(res http.ResponseWriter, req *http.Request) {
+
+	type dataRequest struct {
+		URL string `json:"url"`
+	}
+
+	type dataAnswer struct {
+		ShortURL string `json:"result"`
+	}
+
+	var dataReq dataRequest
+	var dataAnsw dataAnswer
+	var buf bytes.Buffer
+
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		log.Printf("failed read body of request: %v", err)
+		http.Error(res, "url is required", http.StatusBadRequest)
+		return
+	}
+
+	if err = json.Unmarshal(buf.Bytes(), &dataReq); err != nil {
+		log.Printf("failed unmarshal: %v", err)
+		http.Error(res, "wrong JSON", http.StatusBadRequest)
+		return
+	}
+
+	if dataReq.URL == "" {
+		log.Printf("URL is empty")
+		http.Error(res, "URL is empty", http.StatusBadRequest)
+		return
+	}
+
+	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, h.mapURL)
+	if err != nil {
+		log.Printf("error GetShortURL: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
+
+	baseURL := h.cfg.AddrForURL
+	if baseURL == "" {
+		baseURL = "http://" + req.Host
+	}
+
+	dataAnsw.ShortURL, err = url.JoinPath(baseURL, "/", dataAnsw.ShortURL)
+	if err != nil {
+		log.Printf("failed to compose the shortened URL: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := json.Marshal(dataAnsw)
+	if err != nil {
+		log.Printf("failed Marshal: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	res.Write(resp)
+
 }

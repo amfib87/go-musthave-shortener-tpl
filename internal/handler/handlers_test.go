@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,6 +80,75 @@ func TestIDGetHandler(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, res.Code, "код ответа не совпадает с ожидаемым")
 			if res.Code == http.StatusTemporaryRedirect {
 				assert.Equal(t, url, loc, "url определен неверно")
+			}
+		})
+	}
+}
+
+func TestPostShortenHandler(t *testing.T) {
+	// Создаём тестовый сервер
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := NewHandler(&config.Cnfg{
+			AddrForURL: "http://test-host",
+		})
+		h.PostShortenHandler(w, r)
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name           string
+		requestBody    string
+		expectedStatus int
+		expectedResult bool
+	}{
+		{
+			name:           "Valid URL",
+			requestBody:    `{"url": "https://example.com"}`,
+			expectedStatus: http.StatusCreated,
+			expectedResult: true,
+		},
+		{
+			name:           "Empty URL",
+			requestBody:    `{"url": ""}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedResult: false,
+		},
+		{
+			name:           "Invalid JSON",
+			requestBody:    `{"url": }`,
+			expectedStatus: http.StatusBadRequest,
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/shorten", strings.NewReader(tt.requestBody))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, resp.StatusCode)
+			}
+
+			if tt.expectedResult {
+				var result map[string]string
+				err = json.NewDecoder(resp.Body).Decode(&result)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if result["result"] == "" {
+					t.Errorf("expected result %t, got %q", tt.expectedResult, result["result"])
+				}
 			}
 		})
 	}
