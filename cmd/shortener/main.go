@@ -15,7 +15,10 @@ func main() {
 	config.ParseFlags(cfg)
 
 	// Инициализируем маршрутизатор с конфигурацией
-	router := router.Init(cfg)
+	router, err := router.Init(cfg)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	if err := logger.Initialize("Info"); err != nil {
 		log.Fatal(err.Error())

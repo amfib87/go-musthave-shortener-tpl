@@ -9,6 +9,7 @@ import (
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMainPostHandler(t *testing.T) {
@@ -26,7 +27,10 @@ func TestMainPostHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.cfg)
+			h, err := NewHandler(tt.cfg)
+			if err != nil {
+				require.Equal(t, err, nil)
+			}
 			res := httptest.NewRecorder()
 
 			body := tt.url
@@ -45,7 +49,10 @@ func TestIDGetHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
 
 	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: ""}
-	h := NewHandler(cfg)
+	h, err := NewHandler(cfg)
+	if err != nil {
+		require.Equal(t, err, nil)
+	}
 
 	h.MainPostHandler(res, req)
 	assert.Equal(t, http.StatusCreated, res.Code, "код ответа не совпадает с ожидаемым")
@@ -88,9 +95,10 @@ func TestIDGetHandler(t *testing.T) {
 func TestPostShortenHandler(t *testing.T) {
 	// Создаём тестовый сервер
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := NewHandler(&config.Cnfg{
+		h, err := NewHandler(&config.Cnfg{
 			AddrForURL: "http://test-host",
 		})
+		require.Equal(t, err, nil)
 		h.PostShortenHandler(w, r)
 	}))
 	defer ts.Close()

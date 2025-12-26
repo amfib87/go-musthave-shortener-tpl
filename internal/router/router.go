@@ -15,19 +15,22 @@ type Router struct {
 }
 
 // Init создаёт и настраивает маршрутизатор с конфигурацией
-func Init(cfg *config.Cnfg) *Router {
+func Init(cfg *config.Cnfg) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
 	}
 
 	// Создаём обработчик с конфигурацией
-	h := handler.NewHandler(cfg)
+	h, err := handler.NewHandler(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", log.RequestLogger(gzip.GzipMiddleware(h.IDGetHandler)))
 	r.chi.Post("/", log.RequestLogger(gzip.GzipMiddleware(h.MainPostHandler)))
 	r.chi.Post("/{api}/{shorten}", log.RequestLogger(gzip.GzipMiddleware(h.PostShortenHandler)))
-	return r
+	return r, nil
 }
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {

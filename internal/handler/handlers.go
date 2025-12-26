@@ -18,11 +18,16 @@ type Handler struct {
 	mapURL *model.StringMap
 }
 
-func NewHandler(cfg *config.Cnfg) *Handler {
+func NewHandler(cfg *config.Cnfg) (h *Handler, err error) {
+	data, err := service.InitMap(cfg.StoragePath)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Handler{
 		cfg:    cfg,
-		mapURL: service.InitMap(),
-	}
+		mapURL: data,
+	}, nil
 }
 
 func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {

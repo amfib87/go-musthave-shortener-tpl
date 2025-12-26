@@ -1,17 +1,42 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 )
 
-func InitMap() *model.StringMap {
-	return &model.StringMap{
-		Data: make(map[string]string),
+func InitMap(name string) (*model.StringMap, error) {
+	if name == "" {
+		return nil, os.ErrInvalid
 	}
+
+	var data []byte
+
+	_, err := os.Stat(name)
+	if err == nil {
+		data, err = os.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	stringMap := &model.StringMap{
+		Data: make(model.TData),
+		Name: name,
+	}
+
+	if len(data) != 0 {
+		if err := json.Unmarshal(data, &stringMap.Data); err != nil {
+			return nil, err
+		}
+	}
+
+	return stringMap, nil
 }
 
 func GetShortURL(key string, m *model.StringMap) (string, error) {
