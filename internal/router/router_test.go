@@ -1,6 +1,7 @@
 package router
 
 import (
+	"os"
 	"testing"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
@@ -8,6 +9,8 @@ import (
 )
 
 func TestInit(t *testing.T) {
+	path := os.TempDir() + "Test9"
+
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
@@ -15,7 +18,7 @@ func TestInit(t *testing.T) {
 		router bool
 		err    error
 	}{
-		{name: "Succs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: ""}, router: true, err: nil},
+		{name: "Succs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}, router: true, err: nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

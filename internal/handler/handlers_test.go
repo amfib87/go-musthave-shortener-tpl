@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,6 +14,8 @@ import (
 )
 
 func TestMainPostHandler(t *testing.T) {
+	path := os.TempDir() + "Test9"
+
 	tests := []struct {
 		name         string // description of this test case
 		cfg          *config.Cnfg
@@ -21,7 +24,7 @@ func TestMainPostHandler(t *testing.T) {
 		expectedCode int
 	}{
 		// TODO: Add test cases.
-		{name: "postSuccs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: ""}, method: http.MethodPost,
+		{name: "postSuccs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}, method: http.MethodPost,
 			url: "http://yandex", expectedCode: http.StatusCreated},
 	}
 
@@ -44,11 +47,12 @@ func TestMainPostHandler(t *testing.T) {
 }
 
 func TestIDGetHandler(t *testing.T) {
+	path := os.TempDir() + "Test9"
 	url := "http://rambler"
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
 
-	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: ""}
+	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}
 	h, err := NewHandler(cfg)
 	if err != nil {
 		require.Equal(t, err, nil)
@@ -93,10 +97,12 @@ func TestIDGetHandler(t *testing.T) {
 }
 
 func TestPostShortenHandler(t *testing.T) {
+	path := os.TempDir() + "Test9"
+
 	// Создаём тестовый сервер
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h, err := NewHandler(&config.Cnfg{
-			AddrForURL: "http://test-host",
+			AddrForURL: "http://test-host", StoragePath: path,
 		})
 		require.Equal(t, err, nil)
 		h.PostShortenHandler(w, r)
