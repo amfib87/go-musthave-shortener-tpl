@@ -19,12 +19,10 @@ func TestInit(t *testing.T) {
 		os.Remove(tempFile.Name()) // удаляем файл после теста
 	}()
 
-	// Используем имя созданного файла как StoragePath
 	path := tempFile.Name()
 
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
+		name   string // description of this test case
 		cfg    *config.Cnfg
 		router bool
 		err    error

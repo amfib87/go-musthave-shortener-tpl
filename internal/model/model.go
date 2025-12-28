@@ -43,13 +43,15 @@ func (m *StringMap) GetFullURL(key string) (val string, err error) {
 }
 
 func saveFile(data TData, f *os.File) error {
-	// сериализуем структуру в JSON формат
+	// сериализуем структуру
 	dataJSON, err := json.MarshalIndent(data, "", "   ")
 	if err != nil {
 		return err
 	}
-	// сохраняем данные в файл
+
 	writer := bufio.NewWriter(f)
+
+	// сохраняем данные в файл
 	if _, err := writer.Write(dataJSON); err != nil {
 		return err
 	}
