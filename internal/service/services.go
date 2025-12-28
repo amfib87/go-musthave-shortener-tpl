@@ -28,7 +28,7 @@ func InitMap(file *os.File) (*model.StringMap, error) {
 
 	if len(data) != 0 {
 		if err := json.Unmarshal(data, &stringMap.Data); err != nil {
-			return nil, fmt.Errorf("failed Unmarshal: %v", err)
+			return nil, fmt.Errorf("failed json Unmarshal: %v", err)
 		}
 	}
 

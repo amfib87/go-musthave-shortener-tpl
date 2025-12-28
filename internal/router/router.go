@@ -20,7 +20,7 @@ func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
 		chi: chi.NewRouter(),
 	}
 
-	// Создаём обработчик с конфигурацией
+	// Создаём обработчик
 	h, err := handler.NewHandler(cfg, file, lg)
 	if err != nil {
 		return nil, fmt.Errorf("failed NewHandler: %v", err)

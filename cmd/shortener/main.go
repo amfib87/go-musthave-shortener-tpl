@@ -13,7 +13,7 @@ import (
 func main() {
 	logger, err := logger.Initialize("Info")
 	if err != nil {
-		log.Fatalf("failed to init logger: %v", err)
+		log.Fatalf("failed init logger: %v", err)
 	}
 
 	// обрабатываем аргументы командной строки

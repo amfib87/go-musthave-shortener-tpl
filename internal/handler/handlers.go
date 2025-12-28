@@ -37,7 +37,7 @@ func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (h *Handler, e
 	}, nil
 }
 
-func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
+func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
@@ -50,9 +50,9 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortURL, err := service.GetShortURL(URL, h.mapURL, h.file)
+	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file)
 	if err != nil {
-		h.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -61,19 +61,19 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusCreated)
 
 	var serv string
-	if h.cfg.AddrForURL == "" {
+	if hndl.cfg.AddrForURL == "" {
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
-			h.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 		serv = val
 
 	} else {
-		val, err := url.JoinPath(h.cfg.AddrForURL, "/", shortURL)
+		val, err := url.JoinPath(hndl.cfg.AddrForURL, "/", shortURL)
 		if err != nil {
-			h.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
+			hndl.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -83,7 +83,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte(serv))
 }
 
-func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
+func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "" {
 		http.Error(res, "id is empty", http.StatusBadRequest)
 		return
@@ -95,14 +95,14 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fullURL, err := h.mapURL.GetFullURL(ID)
+	fullURL, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
-		h.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if fullURL == "" {
-		h.Logger.Lg.Sugar().Infoln("id не найдено")
+		hndl.Logger.Lg.Sugar().Infoln("id не найдено")
 		http.Error(res, "id не найдено", http.StatusNotFound)
 		return
 	}
@@ -112,7 +112,7 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
+func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
 
 	type dataRequest struct {
 		URL string `json:"url"`
@@ -142,9 +142,9 @@ func (h *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, h.mapURL, h.file)
+	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file)
 	if err != nil {
-		h.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -152,21 +152,21 @@ func (h *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request)
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
 
-	baseURL := h.cfg.AddrForURL
+	baseURL := hndl.cfg.AddrForURL
 	if baseURL == "" {
 		baseURL = "http://" + req.Host
 	}
 
 	dataAnsw.ShortURL, err = url.JoinPath(baseURL, "/", dataAnsw.ShortURL)
 	if err != nil {
-		h.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(dataAnsw)
 	if err != nil {
-		h.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
