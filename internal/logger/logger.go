@@ -1,78 +1,80 @@
 package logger
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 )
 
+type TLog struct {
+	Lg *zap.Logger
+}
+
 type (
-	responseData struct {
-		status int
-		size   int
+	ResponseData struct {
+		Status int
+		Size   int
 	}
 
-	loggingResponseWriter struct {
-		http.ResponseWriter //
-		responseData        *responseData
+	LoggingResponseWriter struct {
+		http.ResponseWriter
+		ResponseData *ResponseData
 	}
 )
 
-var Log *zap.Logger = zap.NewNop()
-
 // Initialize инициализирует синглтон логера с необходимым уровнем логирования.
-func Initialize(level string) error {
+func Initialize(level string) (lg *TLog, err error) {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed ParseAtomiclevel: %v", err)
 	}
 	cfg := zap.NewProductionConfig()
 	cfg.Level = lvl
 
 	zl, err := cfg.Build()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed cfg.Build: %v", err)
 	}
 
-	Log = zl
-	return nil
+	return &TLog{Lg: zl}, nil
 }
 
-func RequestLogger(h http.HandlerFunc) http.HandlerFunc {
+func (r *LoggingResponseWriter) Write(b []byte) (int, error) {
+	size, err := r.ResponseWriter.Write(b)
+	r.ResponseData.Size += size
+	return size, err
+}
+
+func (r *LoggingResponseWriter) WriteHeader(statusCode int) {
+	r.ResponseWriter.WriteHeader(statusCode)
+	r.ResponseData.Status = statusCode
+}
+
+func (lg *TLog) RequestLogger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		responseData := &responseData{
-			status: 0,
-			size:   0,
+		responseData := &ResponseData{
+			Status: 0,
+			Size:   0,
 		}
-		lw := loggingResponseWriter{
+		lw := LoggingResponseWriter{
 			ResponseWriter: w,
-			responseData:   responseData,
+			ResponseData:   responseData,
 		}
 
 		h.ServeHTTP(&lw, r)
 
 		duration := time.Since(start)
 
-		Log.Sugar().Infoln(
+		lg.Lg.Sugar().Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
-			"status", responseData.status,
+			"status", responseData.Status,
 			"duration", duration,
-			"size", responseData.size,
+			"size", responseData.Size,
 		)
 	})
-}
-
-func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size
-	return size, err
-}
-
-func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"path/filepath"
 )
 
 type Cnfg struct {
@@ -28,17 +29,23 @@ func ParseFlags(cfg *Cnfg) {
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
 
-	if envServAddr := os.Getenv("SERVER_ADDRESS"); envServAddr != "" {
+	if envServAddr, _ := os.LookupEnv("SERVER_ADDRESS"); envServAddr != "" {
 		cfg.ServRunAddr = envServAddr
 	}
-	if envAddrForURL := os.Getenv("BASE_URL"); envAddrForURL != "" {
+	if envAddrForURL, _ := os.LookupEnv("BASE_URL"); envAddrForURL != "" {
 		cfg.AddrForURL = envAddrForURL
 	}
 
-	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
+	if envStoragePath, _ := os.LookupEnv("FILE_STORAGE_PATH"); envStoragePath != "" {
 		cfg.StoragePath = envStoragePath
 	}
+
 	if cfg.StoragePath == "" {
-		cfg.StoragePath = os.TempDir() + "Test9"
+		path, err := os.UserHomeDir()
+		if err != nil || path == "" {
+			path = "/var/lib/myapp"
+		}
+
+		cfg.StoragePath = filepath.Join(path, "Documents", "Iter9")
 	}
 }

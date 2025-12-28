@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
+	gz "github.com/amfib87/go-musthave-shortener-tpl/internal/gzip"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 )
@@ -16,10 +19,12 @@ import (
 type Handler struct {
 	cfg    *config.Cnfg
 	mapURL *model.StringMap
+	file   *os.File
+	Logger *logger.TLog
 }
 
-func NewHandler(cfg *config.Cnfg) (h *Handler, err error) {
-	data, err := service.InitMap(cfg.StoragePath)
+func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (h *Handler, err error) {
+	data, err := service.InitMap(file)
 	if err != nil {
 		return nil, err
 	}
@@ -27,10 +32,12 @@ func NewHandler(cfg *config.Cnfg) (h *Handler, err error) {
 	return &Handler{
 		cfg:    cfg,
 		mapURL: data,
+		file:   file,
+		Logger: lg,
 	}, nil
 }
 
-func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
@@ -43,9 +50,9 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortURL, err := service.GetShortURL(URL, h.mapURL)
+	shortURL, err := service.GetShortURL(URL, h.mapURL, h.file)
 	if err != nil {
-		log.Printf("error GetShortURL: %v", err)
+		h.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -57,7 +64,7 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 	if h.cfg.AddrForURL == "" {
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
-			log.Printf("failed to compose the shortened URL: %v", err)
+			h.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -66,7 +73,7 @@ func (h *Handler) MainPostHandler(res http.ResponseWriter, req *http.Request) {
 	} else {
 		val, err := url.JoinPath(h.cfg.AddrForURL, "/", shortURL)
 		if err != nil {
-			log.Printf("500 Internal Error: %v", err)
+			h.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -81,20 +88,21 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "id is empty", http.StatusBadRequest)
 		return
 	}
+
 	ID := req.URL.Path[1:]
 	if ID == "" {
-		log.Println("ID is empty")
 		http.Error(res, "id is required", http.StatusBadRequest)
 		return
 	}
 
 	fullURL, err := h.mapURL.GetFullURL(ID)
 	if err != nil {
-		log.Printf("500 Internal Error: %v", err)
+		h.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if fullURL == "" {
+		h.Logger.Lg.Sugar().Infoln("id не найдено")
 		http.Error(res, "id не найдено", http.StatusNotFound)
 		return
 	}
@@ -104,7 +112,7 @@ func (h *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) PostShortenHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
 
 	type dataRequest struct {
 		URL string `json:"url"`
@@ -120,26 +128,23 @@ func (h *Handler) PostShortenHandler(res http.ResponseWriter, req *http.Request)
 
 	_, err := buf.ReadFrom(req.Body)
 	if err != nil {
-		log.Printf("failed read body of request: %v", err)
 		http.Error(res, "url is required", http.StatusBadRequest)
 		return
 	}
 
 	if err = json.Unmarshal(buf.Bytes(), &dataReq); err != nil {
-		log.Printf("failed unmarshal: %v", err)
 		http.Error(res, "wrong JSON", http.StatusBadRequest)
 		return
 	}
 
 	if dataReq.URL == "" {
-		log.Printf("URL is empty")
 		http.Error(res, "URL is empty", http.StatusBadRequest)
 		return
 	}
 
-	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, h.mapURL)
+	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, h.mapURL, h.file)
 	if err != nil {
-		log.Printf("error GetShortURL: %v", err)
+		h.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -154,17 +159,47 @@ func (h *Handler) PostShortenHandler(res http.ResponseWriter, req *http.Request)
 
 	dataAnsw.ShortURL, err = url.JoinPath(baseURL, "/", dataAnsw.ShortURL)
 	if err != nil {
-		log.Printf("failed to compose the shortened URL: %v", err)
+		h.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(dataAnsw)
 	if err != nil {
-		log.Printf("failed Marshal: %v", err)
+		h.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	res.Write(resp)
 
+}
+
+func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		origRes := res
+
+		contentType := req.Header.Get("Content-Type")
+		if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+			acceptEncoding := req.Header.Get("Accept-Encoding")
+			if strings.Contains(acceptEncoding, "gzip") {
+				newRes := gz.NewCompressWriter(res)
+				origRes = newRes
+				defer newRes.Close()
+			}
+		}
+
+		contentEncoding := req.Header.Get("Content-Encoding")
+		if strings.Contains(contentEncoding, "gzip") {
+			newReader, err := gz.NewCompressReader(req.Body)
+			if err != nil {
+				hndl.Logger.Lg.Sugar().Infoln("failed init newReader: %v", err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			req.Body = newReader
+			defer newReader.Close()
+		}
+
+		h.ServeHTTP(origRes, req)
+	})
 }

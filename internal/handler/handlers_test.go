@@ -9,12 +9,21 @@ import (
 	"testing"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMainPostHandler(t *testing.T) {
-	path := os.TempDir() + "Test9"
+	tempFile, err := os.CreateTemp(os.TempDir(), "Iter9")
+	if err != nil {
+		t.Fatal("failed create temp file", err)
+	}
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name()) // удаляем файл после теста
+	}()
+	path := tempFile.Name()
 
 	tests := []struct {
 		name         string // description of this test case
@@ -23,14 +32,18 @@ func TestMainPostHandler(t *testing.T) {
 		url          string
 		expectedCode int
 	}{
-		// TODO: Add test cases.
 		{name: "postSuccs", cfg: &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}, method: http.MethodPost,
 			url: "http://yandex", expectedCode: http.StatusCreated},
 	}
 
+	logger, err := logger.Initialize("Info")
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewHandler(tt.cfg)
+			h, err := NewHandler(tt.cfg, tempFile, logger)
 			if err != nil {
 				require.Equal(t, err, nil)
 			}
@@ -39,7 +52,7 @@ func TestMainPostHandler(t *testing.T) {
 			body := tt.url
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(body))
 
-			h.MainPostHandler(res, req)
+			h.PostURLHandler(res, req)
 
 			assert.Equal(t, tt.expectedCode, res.Code, "код ответа не совпадает с ожидаемым")
 		})
@@ -47,18 +60,32 @@ func TestMainPostHandler(t *testing.T) {
 }
 
 func TestIDGetHandler(t *testing.T) {
-	path := os.TempDir() + "Test9"
+	tempFile, err := os.CreateTemp(os.TempDir(), "Iter9")
+	if err != nil {
+		t.Fatal("failed create temp file", err)
+	}
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name()) // удаляем файл после теста
+	}()
+
+	path := tempFile.Name()
 	url := "http://rambler"
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
 
+	logger, err := logger.Initialize("Info")
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
+
 	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}
-	h, err := NewHandler(cfg)
+	h, err := NewHandler(cfg, tempFile, logger)
 	if err != nil {
 		require.Equal(t, err, nil)
 	}
 
-	h.MainPostHandler(res, req)
+	h.PostURLHandler(res, req)
 	assert.Equal(t, http.StatusCreated, res.Code, "код ответа не совпадает с ожидаемым")
 
 	shortURL := res.Body.String()
@@ -69,7 +96,6 @@ func TestIDGetHandler(t *testing.T) {
 		url          string
 		expectedCode int
 	}{
-		// TODO: Add test cases.
 		{name: "getSuccs", method: http.MethodGet, url: shortURL,
 			expectedCode: http.StatusTemporaryRedirect},
 
@@ -97,15 +123,29 @@ func TestIDGetHandler(t *testing.T) {
 }
 
 func TestPostShortenHandler(t *testing.T) {
-	path := os.TempDir() + "Test9"
+	tempFile, err := os.CreateTemp(os.TempDir(), "Iter9")
+	if err != nil {
+		t.Fatal("failed create temp file", err)
+	}
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name()) // удаляем файл после теста
+	}()
+
+	path := tempFile.Name()
+
+	logger, err := logger.Initialize("Info")
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
 
 	// Создаём тестовый сервер
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h, err := NewHandler(&config.Cnfg{
 			AddrForURL: "http://test-host", StoragePath: path,
-		})
+		}, tempFile, logger)
 		require.Equal(t, err, nil)
-		h.PostShortenHandler(w, r)
+		h.PostURLJSONHandler(w, r)
 	}))
 	defer ts.Close()
 

@@ -1,12 +1,13 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
-	"github.com/amfib87/go-musthave-shortener-tpl/internal/gzip"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/handler"
-	log "github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/go-chi/chi"
 )
 
@@ -15,21 +16,24 @@ type Router struct {
 }
 
 // Init создаёт и настраивает маршрутизатор с конфигурацией
-func Init(cfg *config.Cnfg) (*Router, error) {
+func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
 	}
 
 	// Создаём обработчик с конфигурацией
-	h, err := handler.NewHandler(cfg)
+	h, err := handler.NewHandler(cfg, file, lg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed NewHandler: %v", err)
 	}
 
+	r.chi.Use(h.Logger.RequestLogger)
+	r.chi.Use(h.GzipMiddleware)
+
 	// Регистрируем маршруты
-	r.chi.Get("/{id}", log.RequestLogger(gzip.GzipMiddleware(h.IDGetHandler)))
-	r.chi.Post("/", log.RequestLogger(gzip.GzipMiddleware(h.MainPostHandler)))
-	r.chi.Post("/{api}/{shorten}", log.RequestLogger(gzip.GzipMiddleware(h.PostShortenHandler)))
+	r.chi.Get("/{id}", h.IDGetHandler)
+	r.chi.Post("/", h.PostURLHandler)
+	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
 	return r, nil
 }
 

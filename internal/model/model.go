@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,21 +14,20 @@ type TData map[string]string
 var ErrKeyExists = errors.New("key already exists")
 
 type StringMap struct {
-	Mu   sync.Mutex
+	mu   sync.Mutex
 	Data TData `json:"data"`
-	Name string
 }
 
-func (m *StringMap) InsertShortURL(key, shortURL string) error {
-	m.Mu.Lock()
-	defer m.Mu.Unlock()
+func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if _, exists := (m.Data)[shortURL]; exists {
 		return ErrKeyExists
 	}
 
 	(m.Data)[shortURL] = key
-	if err := saveFile(m.Data, m.Name); err != nil {
+	if err := saveFile(m.Data, f); err != nil {
 		return err
 	}
 
@@ -42,15 +42,17 @@ func (m *StringMap) GetFullURL(key string) (val string, err error) {
 	return value, nil
 }
 
-func saveFile(data TData, name string) error {
+func saveFile(data TData, f *os.File) error {
 	// сериализуем структуру в JSON формат
 	dataJSON, err := json.MarshalIndent(data, "", "   ")
 	if err != nil {
 		return err
 	}
 	// сохраняем данные в файл
-	if err := os.WriteFile(name, dataJSON, 0666); err != nil {
+	writer := bufio.NewWriter(f)
+	if _, err := writer.Write(dataJSON); err != nil {
 		return err
 	}
+	writer.Flush()
 	return nil
 }

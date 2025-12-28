@@ -13,7 +13,6 @@ func TestNewConfig(t *testing.T) {
 		name   string // description of this test case
 		filled bool
 	}{
-		// TODO: Add test cases.
 		{name: "config not nill", filled: true},
 	}
 	for _, tt := range tests {

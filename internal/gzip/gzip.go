@@ -4,67 +4,37 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"strings"
 )
 
-func GzipMiddleware(h http.HandlerFunc) http.HandlerFunc {
-	return func(res http.ResponseWriter, req *http.Request) {
-		origRes := res
+type CompressWriter struct {
+	W  http.ResponseWriter
+	Zw *gzip.Writer
+}
 
-		contentType := req.Header.Get("Content-Type")
-		if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
-			acceptEncoding := req.Header.Get("Accept-Encoding")
-			if strings.Contains(acceptEncoding, "gzip") {
-				newRes := newCompressWriter(res)
-				origRes = newRes
-				defer newRes.Close()
-			}
-		}
-
-		contentEncoding := req.Header.Get("Content-Encoding")
-		if strings.Contains(contentEncoding, "gzip") {
-			newReader, err := newCompressReader(req.Body)
-			if err != nil {
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			req.Body = newReader
-			defer newReader.Close()
-		}
-
-		h.ServeHTTP(origRes, req)
+func NewCompressWriter(w http.ResponseWriter) *CompressWriter {
+	return &CompressWriter{
+		W:  w,
+		Zw: gzip.NewWriter(w),
 	}
 }
 
-type compressWriter struct {
-	w  http.ResponseWriter
-	zw *gzip.Writer
+func (c *CompressWriter) Header() http.Header {
+	return c.W.Header()
 }
 
-func newCompressWriter(w http.ResponseWriter) *compressWriter {
-	return &compressWriter{
-		w:  w,
-		zw: gzip.NewWriter(w),
-	}
+func (c *CompressWriter) Write(p []byte) (int, error) {
+	return c.Zw.Write(p)
 }
 
-func (c *compressWriter) Header() http.Header {
-	return c.w.Header()
-}
-
-func (c *compressWriter) Write(p []byte) (int, error) {
-	return c.zw.Write(p)
-}
-
-func (c *compressWriter) WriteHeader(statusCode int) {
+func (c *CompressWriter) WriteHeader(statusCode int) {
 	if statusCode < 300 {
-		c.w.Header().Set("Content-Encoding", "gzip")
+		c.W.Header().Set("Content-Encoding", "gzip")
 	}
-	c.w.WriteHeader(statusCode)
+	c.W.WriteHeader(statusCode)
 }
 
-func (c *compressWriter) Close() error {
-	return c.zw.Close()
+func (c *CompressWriter) Close() error {
+	return c.Zw.Close()
 }
 
 type compressReader struct {
@@ -72,7 +42,7 @@ type compressReader struct {
 	zr *gzip.Reader
 }
 
-func newCompressReader(r io.ReadCloser) (*compressReader, error) {
+func NewCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, err
