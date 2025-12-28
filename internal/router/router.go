@@ -15,7 +15,6 @@ type Router struct {
 	chi *chi.Mux
 }
 
-// Init создаёт и настраивает маршрутизатор с конфигурацией
 func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
@@ -27,6 +26,7 @@ func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
 		return nil, fmt.Errorf("failed NewHandler: %v", err)
 	}
 
+	//Middlieware
 	r.chi.Use(h.Logger.RequestLogger)
 	r.chi.Use(h.GzipMiddleware)
 

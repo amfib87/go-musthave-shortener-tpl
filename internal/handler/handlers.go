@@ -192,7 +192,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 		if strings.Contains(contentEncoding, "gzip") {
 			newReader, err := gz.NewCompressReader(req.Body)
 			if err != nil {
-				hndl.Logger.Lg.Sugar().Infoln("failed init newReader: %v", err)
+				hndl.Logger.Lg.Sugar().Infoln("failed init NewCompressReader: %v", err)
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
