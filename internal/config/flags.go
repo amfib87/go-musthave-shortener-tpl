@@ -46,6 +46,6 @@ func ParseFlags(cfg *Cnfg) {
 			path = "/var/lib/myapp"
 		}
 
-		cfg.StoragePath = filepath.Join(path, "Documents", "Iter9")
+		cfg.StoragePath = filepath.Join(path, "Iter9")
 	}
 }
