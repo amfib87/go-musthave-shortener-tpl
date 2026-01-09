@@ -8,6 +8,8 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/router"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/store"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {
@@ -20,6 +22,12 @@ func main() {
 	cfg := config.NewConfig()
 	config.ParseFlags(cfg)
 
+	db, err := store.InitDb(cfg.DataBaseDsn)
+	if err != nil {
+		logger.Lg.Sugar().Fatalf("failed InitDB: %v", err)
+	}
+	defer db.Close()
+
 	file, err := service.InitFile(cfg.StoragePath)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed to init file: %v", err)
@@ -27,7 +35,7 @@ func main() {
 	defer service.FileClose(file, logger)
 
 	// Инициализируем маршрутизатор с конфигурацией
-	router, err := router.Init(cfg, file, logger)
+	router, err := router.Init(cfg, file, logger, db)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed to init router: %v", err)
 	}

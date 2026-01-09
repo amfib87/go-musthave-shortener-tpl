@@ -2,12 +2,15 @@ package handler
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	gz "github.com/amfib87/go-musthave-shortener-tpl/internal/gzip"
@@ -21,9 +24,10 @@ type Handler struct {
 	mapURL *model.StringMap
 	file   *os.File
 	Logger *logger.TLog
+	Db     *sql.DB
 }
 
-func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (h *Handler, err error) {
+func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h *Handler, err error) {
 	data, err := service.InitMap(file)
 	if err != nil {
 		return nil, err
@@ -34,6 +38,7 @@ func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (h *Handler, e
 		mapURL: data,
 		file:   file,
 		Logger: lg,
+		Db:     db,
 	}, nil
 }
 
@@ -202,4 +207,24 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 
 		h.ServeHTTP(origRes, req)
 	})
+}
+
+func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if hndl.Db == nil {
+		hndl.Logger.Lg.Sugar().Errorln("DB failed init")
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if er := hndl.Db.PingContext(ctx); er != nil {
+		hndl.Logger.Lg.Sugar().Infoln("err", er.Error())
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	res.Write([]byte(""))
 }

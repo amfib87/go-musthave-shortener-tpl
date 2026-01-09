@@ -36,7 +36,7 @@ func TestInit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Init(tt.cfg, tempFile, logger)
+			got, err := Init(tt.cfg, tempFile, logger, nil)
 			assert.NotNil(t, got, "Объект = nil")
 			assert.Equal(t, err, tt.err)
 		})

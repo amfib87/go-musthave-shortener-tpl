@@ -43,7 +43,7 @@ func TestMainPostHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewHandler(tt.cfg, tempFile, logger)
+			h, err := NewHandler(tt.cfg, tempFile, logger, nil)
 			if err != nil {
 				require.Equal(t, err, nil)
 			}
@@ -80,7 +80,7 @@ func TestIDGetHandler(t *testing.T) {
 	}
 
 	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}
-	h, err := NewHandler(cfg, tempFile, logger)
+	h, err := NewHandler(cfg, tempFile, logger, nil)
 	if err != nil {
 		require.Equal(t, err, nil)
 	}
@@ -143,7 +143,7 @@ func TestPostShortenHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h, err := NewHandler(&config.Cnfg{
 			AddrForURL: "http://test-host", StoragePath: path,
-		}, tempFile, logger)
+		}, tempFile, logger, nil)
 		require.Equal(t, err, nil)
 		h.PostURLJSONHandler(w, r)
 	}))

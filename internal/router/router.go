@@ -1,6 +1,7 @@
 package router
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,13 +16,13 @@ type Router struct {
 	chi *chi.Mux
 }
 
-func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
+func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
 	}
 
 	// Создаём обработчик
-	h, err := handler.NewHandler(cfg, file, lg)
+	h, err := handler.NewHandler(cfg, file, lg, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed NewHandler: %v", err)
 	}
@@ -34,6 +35,7 @@ func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog) (*Router, error) {
 	r.chi.Get("/{id}", h.IDGetHandler)
 	r.chi.Post("/", h.PostURLHandler)
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
+	r.chi.Get("/ping", h.GetPing)
 	return r, nil
 }
 
