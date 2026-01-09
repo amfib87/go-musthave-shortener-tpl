@@ -22,7 +22,7 @@ func main() {
 	cfg := config.NewConfig()
 	config.ParseFlags(cfg)
 
-	db, err := store.InitDb(cfg.DataBaseDsn)
+	db, err := store.InitDB(cfg.DataBaseDsn)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed InitDB: %v", err)
 	}

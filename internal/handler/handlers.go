@@ -24,7 +24,7 @@ type Handler struct {
 	mapURL *model.StringMap
 	file   *os.File
 	Logger *logger.TLog
-	Db     *sql.DB
+	DB     *sql.DB
 }
 
 func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h *Handler, err error) {
@@ -38,7 +38,7 @@ func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h
 		mapURL: data,
 		file:   file,
 		Logger: lg,
-		Db:     db,
+		DB:     db,
 	}, nil
 }
 
@@ -213,13 +213,13 @@ func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if hndl.Db == nil {
+	if hndl.DB == nil {
 		hndl.Logger.Lg.Sugar().Errorln("DB failed init")
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	if er := hndl.Db.PingContext(ctx); er != nil {
+	if er := hndl.DB.PingContext(ctx); er != nil {
 		hndl.Logger.Lg.Sugar().Infoln("err", er.Error())
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

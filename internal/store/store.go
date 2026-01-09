@@ -7,7 +7,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func InitDb(strSet string) (*sql.DB, error) {
+func InitDB(strSet string) (*sql.DB, error) {
 	var ps string
 	ps = strSet
 	if ps == "" {
