@@ -2,6 +2,8 @@ package service
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,35 +15,43 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 )
 
-func InitMap(file *os.File) (*model.StringMap, error) {
-	var data []byte
-
-	reader := bufio.NewReader(file)
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed read data from file: %w", err)
-	}
-
+func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
 	stringMap := &model.StringMap{
 		Data: make(model.TData),
 	}
 
-	if len(data) != 0 {
-		if err := json.Unmarshal(data, &stringMap.Data); err != nil {
-			return nil, fmt.Errorf("failed json Unmarshal: %v", err)
+	if file != nil {
+
+		reader := bufio.NewReader(file)
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed read data from file: %w", err)
 		}
+
+		if len(data) != 0 {
+			if err := json.Unmarshal(data, &stringMap.Data); err != nil {
+				return nil, fmt.Errorf("failed json Unmarshal: %v", err)
+			}
+		}
+
+	} else if db != nil {
+		dataDB, err := model.ReadDB(db)
+		if err != nil {
+			return nil, fmt.Errorf("failed read DB: %v", err)
+		}
+		stringMap.Data = dataDB
 	}
 
 	return stringMap, nil
 }
 
-func GetShortURL(key string, m *model.StringMap, f *os.File) (string, error) {
+func GetShortURL(key string, m *model.StringMap, f *os.File, db *sql.DB, ctx context.Context) (string, error) {
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
-		err := m.InsertShortURL(key, shortURL, f)
+		err := m.InsertShortURL(key, shortURL, f, db, ctx)
 		if err == nil {
 			return shortURL, nil
 		}

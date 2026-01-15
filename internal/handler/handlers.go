@@ -28,7 +28,7 @@ type Handler struct {
 }
 
 func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h *Handler, err error) {
-	data, err := service.InitMap(file)
+	data, err := service.InitMap(file, db)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,10 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file)
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+
+	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file, hndl.DB, ctx)
 	if err != nil {
 		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -147,7 +150,9 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file)
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file, hndl.DB, ctx)
 	if err != nil {
 		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
