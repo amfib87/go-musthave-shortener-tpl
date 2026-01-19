@@ -233,3 +233,57 @@ func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 	res.Write([]byte(""))
 }
+
+func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Request) {
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		http.Error(res, "url is required", http.StatusBadRequest)
+		return
+	}
+
+	var dataReq []model.DataRequestMass
+	if err = json.Unmarshal(buf.Bytes(), &dataReq); err != nil {
+		http.Error(res, "wrong JSON", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+
+	dataAnsw, err := service.GetShortURLMass(dataReq, hndl.mapURL, hndl.file, hndl.DB, ctx)
+	if err != nil {
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
+
+	baseURL := hndl.cfg.AddrForURL
+	if baseURL == "" {
+		baseURL = "http://" + req.Host
+	}
+
+	for ind, lineAnswer := range dataAnsw {
+		lineAnswer.ShortURL, err = url.JoinPath(baseURL, "/", lineAnswer.ShortURL)
+		if err != nil {
+			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		dataAnsw[ind] = lineAnswer
+	}
+
+	resp, err := json.Marshal(dataAnsw)
+	if err != nil {
+		hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	res.Write(resp)
+
+}

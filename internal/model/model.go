@@ -21,6 +21,18 @@ type StringMap struct {
 	Data TData `json:"data"`
 }
 
+// Структура входного элемента
+type DataRequestMass struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+// Структура выходного элемента
+type DataAnswerMass struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
 func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, bd *sql.DB, ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -31,8 +43,35 @@ func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, bd *sql.DB,
 
 	(m.Data)[shortURL] = key
 	if bd != nil {
-		if err := saveToBD(shortURL, key, bd, ctx); err != nil {
+		if err := saveToDB(shortURL, key, bd, ctx); err != nil {
 			return err
+		}
+	} else if f != nil {
+
+		if err := saveFile(m.Data, f); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *StringMap) InsertShortURLMass(values map[string]string, f *os.File, bd *sql.DB, ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for short, full := range values {
+		if _, exists := (m.Data)[short]; exists {
+			return ErrKeyExists
+		}
+		(m.Data)[short] = full
+	}
+
+	if bd != nil {
+		for short, full := range values {
+			if err := saveToDB(short, full, bd, ctx); err != nil {
+				return err
+			}
 		}
 	} else if f != nil {
 
@@ -69,7 +108,7 @@ func saveFile(data TData, f *os.File) error {
 	return nil
 }
 
-func saveToBD(shortURL, key string, bd *sql.DB, ctx context.Context) error {
+func saveToDB(shortURL, key string, bd *sql.DB, ctx context.Context) error {
 	query := `INSERT INTO tdata (shorturl, originalurl) VALUES ($1, $2)`
 	_, err := bd.ExecContext(ctx, query, shortURL, key)
 	if err != nil {

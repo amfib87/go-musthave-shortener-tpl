@@ -15,6 +15,8 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 )
 
+const maxRetries = 5
+
 func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
 	stringMap := &model.StringMap{
 		Data: make(model.TData),
@@ -88,4 +90,43 @@ func FileClose(file *os.File, lg *logger.TLog) {
 	if err := file.Close(); err != nil {
 		lg.Lg.Sugar().Infoln("failed close file: %v", err)
 	}
+}
+
+func GetShortURLMass(values []model.DataRequestMass, m *model.StringMap, f *os.File, db *sql.DB, ctx context.Context) ([]model.DataAnswerMass, error) {
+	export := []model.DataAnswerMass{}
+	shortKeys := make(map[string]string)
+
+	for _, line := range values {
+		var lineData model.DataRequestMass
+		lineData = line
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			shortURL := generateShortID()
+
+			// проверяем на наличие сгенерированного shorturl
+			var count int
+			row := db.QueryRowContext(ctx, "SELECT COUNT(*) as count FROM tdata WHERE shorturl = $1", shortURL)
+			err := row.Scan(&count)
+			if err != nil {
+				return nil, fmt.Errorf("failed queryrow, err: %w", err)
+			}
+			if count != 0 {
+				continue
+			}
+
+			shortKeys[shortURL] = lineData.OriginalURL
+			export = append(export, model.DataAnswerMass{CorrelationID: lineData.CorrelationID, ShortURL: shortURL})
+			break
+		}
+	}
+
+	if len(export) == 0 {
+		return nil, fmt.Errorf("failed to compose unique short URL after %d attempts", maxRetries)
+	}
+
+	if err := m.InsertShortURLMass(shortKeys, f, db, ctx); err != nil {
+		return nil, fmt.Errorf("failed insertShortURLMass, err: %w", err)
+	}
+
+	return export, nil
 }

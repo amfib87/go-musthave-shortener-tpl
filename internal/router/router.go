@@ -36,6 +36,7 @@ func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (*Router
 	r.chi.Post("/", h.PostURLHandler)
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
 	r.chi.Get("/ping", h.GetPing)
+	r.chi.Post("/{api}/{shorten}/{batch}", h.PostMassURLHandler)
 	return r, nil
 }
 
