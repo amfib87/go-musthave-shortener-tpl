@@ -96,10 +96,7 @@ func GetShortURLMass(values []model.DataRequestMass, m *model.StringMap, f *os.F
 	export := []model.DataAnswerMass{}
 	shortKeys := make(map[string]string)
 
-	for _, line := range values {
-		var lineData model.DataRequestMass
-		lineData = line
-
+	for _, lineData := range values {
 		for attempt := 0; attempt < maxRetries; attempt++ {
 			shortURL := generateShortID()
 
