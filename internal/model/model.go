@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 )
@@ -15,6 +14,7 @@ import (
 type TData map[string]string
 
 var ErrKeyExists = errors.New("key already exists")
+var ErrOriginalURLExist = errors.New("original url exists")
 
 type StringMap struct {
 	mu   sync.Mutex
@@ -33,27 +33,38 @@ type DataAnswerMass struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, bd *sql.DB, ctx context.Context) error {
+func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, db *sql.DB, ctx context.Context) (shortURLExist string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if _, exists := (m.Data)[shortURL]; exists {
-		return ErrKeyExists
+		return "", ErrKeyExists
 	}
 
-	(m.Data)[shortURL] = key
-	if bd != nil {
-		if err := saveToDB(shortURL, key, bd, ctx); err != nil {
-			return err
+	if db != nil {
+		err := saveToDB(shortURL, key, db, ctx)
+		if err == ErrOriginalURLExist {
+
+			shortURLExist, err = getExistShortURL(key, db, ctx)
+			if err != nil {
+				return "", fmt.Errorf("failed getExistShortURL: %w", err)
+			}
+			return shortURLExist, ErrOriginalURLExist
+
+		} else if err != nil {
+			return "", err
 		}
+
 	} else if f != nil {
 
 		if err := saveFile(m.Data, f); err != nil {
-			return err
+			return "", err
 		}
 	}
 
-	return nil
+	(m.Data)[shortURL] = key
+
+	return "", nil
 }
 
 func (m *StringMap) InsertShortURLMass(values map[string]string, f *os.File, bd *sql.DB, ctx context.Context) error {
@@ -108,15 +119,24 @@ func saveFile(data TData, f *os.File) error {
 	return nil
 }
 
-func saveToDB(shortURL, key string, bd *sql.DB, ctx context.Context) error {
-	query := `INSERT INTO tdata (shorturl, originalurl) VALUES ($1, $2)`
-	_, err := bd.ExecContext(ctx, query, shortURL, key)
-	if err != nil {
-		// Выводим детальную информацию об ошибке
-		log.Printf("SQL Error: %v", err)
-		log.Printf("shortURL: %q, key: %q", shortURL, key)
+func saveToDB(shortURL, key string, db *sql.DB, ctx context.Context) error {
+	query := `INSERT INTO tdata (shorturl, originalurl) VALUES ($1, $2) ON CONFLICT (originalurl) DO NOTHING RETURNING id`
+	var newID int
+	err := db.QueryRowContext(ctx, query, shortURL, key).Scan(&newID)
+
+	switch {
+	case err == sql.ErrNoRows:
+		return ErrOriginalURLExist
+
+	case err != nil:
+		return fmt.Errorf("failed to insert URL: %w", err)
+
+	case newID == 0:
+		return fmt.Errorf("line id not recieved during insert")
+
+	default:
+		return nil
 	}
-	return err
 }
 
 func ReadDB(db *sql.DB) (data TData, err error) {
@@ -148,4 +168,17 @@ func ReadDB(db *sql.DB) (data TData, err error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func getExistShortURL(originalURL string, db *sql.DB, ctx context.Context) (shortURL string, err error) {
+	querySel := `SELECT shorturl FROM tdata WHERE originalurl = $1`
+	row := db.QueryRowContext(ctx, querySel, originalURL)
+
+	var shortURLExist string
+	err = row.Scan(&shortURLExist)
+	if err != nil {
+		return "", fmt.Errorf("failed scan short url %w", err)
+	}
+
+	return shortURLExist, nil
 }

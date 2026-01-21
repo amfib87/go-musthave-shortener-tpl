@@ -58,7 +58,23 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
 
-	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file, hndl.DB, ctx)
+	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file, hndl.DB, hndl.Logger, ctx)
+	if err == model.ErrOriginalURLExist {
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+
+		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
+		if err != nil {
+			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		res.Header().Set("Content-Type", "text/plain")
+		res.WriteHeader(http.StatusConflict)
+		res.Write([]byte(val))
+		return
+	}
+
 	if err != nil {
 		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -115,7 +131,6 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Header().Set("Content-Type", "text/plain")
 	res.Header().Set("Location", fullURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
@@ -152,9 +167,32 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
-	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file, hndl.DB, ctx)
+	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file, hndl.DB, hndl.Logger, ctx)
+	if err == model.ErrOriginalURLExist {
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+
+		dataAnsw.ShortURL, err = url.JoinPath("http://", req.Host, "/", dataAnsw.ShortURL)
+		if err != nil {
+			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err.Error())
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		resp, err := json.Marshal(dataAnsw)
+		if err != nil {
+			hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusConflict)
+		res.Write([]byte(resp))
+		return
+	}
+
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

@@ -47,13 +47,23 @@ func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
 	return stringMap, nil
 }
 
-func GetShortURL(key string, m *model.StringMap, f *os.File, db *sql.DB, ctx context.Context) (string, error) {
+func GetShortURL(key string, m *model.StringMap, f *os.File, db *sql.DB, lg *logger.TLog, ctx context.Context) (string, error) {
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
-		err := m.InsertShortURL(key, shortURL, f, db, ctx)
+		lg.Lg.Sugar().Infoln("key, shortURL:", key, shortURL)
+		shortURLExist, err := m.InsertShortURL(key, shortURL, f, db, ctx)
+		if err == nil {
+			lg.Lg.Sugar().Infoln("error is empty")
+		} else {
+			lg.Lg.Sugar().Infoln("error with InsertShortURL:", err.Error())
+		}
+
+		if err == model.ErrOriginalURLExist {
+			return shortURLExist, err
+		}
 		if err == nil {
 			return shortURL, nil
 		}
