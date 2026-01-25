@@ -30,6 +30,10 @@ func run() error {
 	config.ParseFlags(cfg)
 
 	URLStorage, err := service.InitURLStorage(cfg, logger)
+	if err != nil {
+		logger.Lg.Error("failed InitURLStorage: %s", zap.Error(err))
+		return err
+	}
 	defer URLStorage.Close(logger)
 
 	// var db *sql.DB
