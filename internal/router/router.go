@@ -1,14 +1,13 @@
 package router
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/handler"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 	"github.com/go-chi/chi"
 )
 
@@ -16,13 +15,13 @@ type Router struct {
 	chi *chi.Mux
 }
 
-func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (*Router, error) {
+func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
 	}
 
 	// Создаём обработчик
-	h, err := handler.NewHandler(cfg, file, lg, db)
+	h, err := handler.NewHandler(cfg, lg, st)
 	if err != nil {
 		return nil, fmt.Errorf("failed NewHandler: %v", err)
 	}
@@ -30,6 +29,7 @@ func Init(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (*Router
 	//Middlieware
 	r.chi.Use(h.Logger.RequestLogger)
 	r.chi.Use(h.GzipMiddleware)
+	r.chi.Use(h.TimeoutMiddleware)
 
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", h.IDGetHandler)

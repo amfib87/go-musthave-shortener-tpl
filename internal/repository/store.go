@@ -23,7 +23,7 @@ func InitDB(strSet string) (db *sql.DB, err error) {
 
 func runMigrations(db *sql.DB) error {
 	if err := goose.SetDialect("postgres"); err != nil {
-		return err
+		return fmt.Errorf("error goose.SetDialect: %w", err)
 	}
 
 	if err := goose.Up(db, "./migrations"); err != nil {

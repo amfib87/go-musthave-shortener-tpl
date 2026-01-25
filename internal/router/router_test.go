@@ -6,6 +6,7 @@ import (
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +37,7 @@ func TestInit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Init(tt.cfg, tempFile, logger, nil)
+			got, err := Init(tt.cfg, logger, service.URLStorage{})
 			assert.NotNil(t, got, "Объект = nil")
 			assert.Equal(t, err, tt.err)
 		})

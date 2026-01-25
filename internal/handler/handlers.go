@@ -2,13 +2,11 @@ package handler
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -17,18 +15,18 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
 	cfg    *config.Cnfg
 	mapURL *model.StringMap
-	file   *os.File
 	Logger *logger.TLog
-	DB     *sql.DB
+	URLSt  service.URLStorage
 }
 
-func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h *Handler, err error) {
-	data, err := service.InitMap(file, db)
+func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (h *Handler, err error) {
+	data, err := service.InitMap(st)
 	if err != nil {
 		return nil, err
 	}
@@ -36,9 +34,8 @@ func NewHandler(cfg *config.Cnfg, file *os.File, lg *logger.TLog, db *sql.DB) (h
 	return &Handler{
 		cfg:    cfg,
 		mapURL: data,
-		file:   file,
 		Logger: lg,
-		DB:     db,
+		URLSt:  st,
 	}, nil
 }
 
@@ -55,16 +52,13 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
-	defer cancel()
-
-	shortURL, err := service.GetShortURL(URL, hndl.mapURL, hndl.file, hndl.DB, hndl.Logger, ctx)
+	shortURL, err := service.GetShortURL(req.Context(), URL, hndl.mapURL, hndl.URLSt, hndl.Logger)
 	if err == model.ErrOriginalURLExist {
 		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
 
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			hndl.Logger.Lg.Error("failed to compose the shortened URL:", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -76,7 +70,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	}
 
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -88,7 +82,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	if hndl.cfg.AddrForURL == "" {
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			hndl.Logger.Lg.Error("failed to compose the shortened URL:", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -97,7 +91,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	} else {
 		val, err := url.JoinPath(hndl.cfg.AddrForURL, "/", shortURL)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
+			hndl.Logger.Lg.Error("500 Internal Error: %v", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -121,7 +115,7 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 
 	fullURL, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("500 Internal Error: %v", err)
+		hndl.Logger.Lg.Error("500 Internal Error: %v", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -165,22 +159,21 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
-	defer cancel()
-	dataAnsw.ShortURL, err = service.GetShortURL(dataReq.URL, hndl.mapURL, hndl.file, hndl.DB, hndl.Logger, ctx)
-	if err == model.ErrOriginalURLExist {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+	dataAnsw.ShortURL, err = service.GetShortURL(req.Context(), dataReq.URL, hndl.mapURL, hndl.URLSt, hndl.Logger)
+
+	if errors.Is(err, model.ErrOriginalURLExist) {
+		hndl.Logger.Lg.Sugar().Debugln("error GetShortURL: %v", err.Error())
 
 		dataAnsw.ShortURL, err = url.JoinPath("http://", req.Host, "/", dataAnsw.ShortURL)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err.Error())
+			hndl.Logger.Lg.Error("failed to compose the shortened URL", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
 		resp, err := json.Marshal(dataAnsw)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+			hndl.Logger.Lg.Error("failed Marshal:", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -192,7 +185,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 	}
 
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -207,14 +200,14 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 
 	dataAnsw.ShortURL, err = url.JoinPath(baseURL, "/", dataAnsw.ShortURL)
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+		hndl.Logger.Lg.Error("failed to compose the shortened URL:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(dataAnsw)
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+		hndl.Logger.Lg.Error("failed Marshal:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -240,7 +233,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 		if strings.Contains(contentEncoding, "gzip") {
 			newReader, err := gz.NewCompressReader(req.Body)
 			if err != nil {
-				hndl.Logger.Lg.Sugar().Infoln("failed init NewCompressReader: %v", err)
+				hndl.Logger.Lg.Error("failed init NewCompressReader:", zap.Error(err))
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -252,18 +245,17 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 	})
 }
 
+func (hndl *Handler) TimeoutMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		resTimeout := http.TimeoutHandler(h, 12*time.Second, "Timeout expired: The server did not respond in time")
+
+		resTimeout.ServeHTTP(res, req)
+	})
+}
+
 func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	if hndl.DB == nil {
-		hndl.Logger.Lg.Sugar().Errorln("DB failed init")
-		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if er := hndl.DB.PingContext(ctx); er != nil {
-		hndl.Logger.Lg.Sugar().Infoln("err", er.Error())
+	if er := hndl.URLSt.Db.PingContext(req.Context()); er != nil {
+		hndl.Logger.Lg.Error("failed PingContext", zap.Error(er))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -287,12 +279,9 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
-	defer cancel()
-
-	dataAnsw, err := service.GetShortURLMass(dataReq, hndl.mapURL, hndl.file, hndl.DB, ctx)
+	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.URLSt)
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err)
+		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -308,7 +297,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 	for ind, lineAnswer := range dataAnsw {
 		lineAnswer.ShortURL, err = url.JoinPath(baseURL, "/", lineAnswer.ShortURL)
 		if err != nil {
-			hndl.Logger.Lg.Sugar().Infoln("failed to compose the shortened URL: %v", err)
+			hndl.Logger.Lg.Error("failed to compose the shortened URL: %v", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -318,7 +307,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 
 	resp, err := json.Marshal(dataAnsw)
 	if err != nil {
-		hndl.Logger.Lg.Sugar().Infoln("failed Marshal: %v", err)
+		hndl.Logger.Lg.Error("failed Marshal: %v", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

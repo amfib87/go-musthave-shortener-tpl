@@ -33,7 +33,7 @@ type DataAnswerMass struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, db *sql.DB, ctx context.Context) (shortURLExist string, err error) {
+func (m *StringMap) InsertShortURL(ctx context.Context, key, shortURL string, file *os.File, db *sql.DB) (shortURLExist string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -42,10 +42,10 @@ func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, db *sql.DB,
 	}
 
 	if db != nil {
-		err := saveToDB(shortURL, key, db, ctx)
-		if err == ErrOriginalURLExist {
+		err := saveToDB(ctx, shortURL, key, db)
+		if errors.Is(err, ErrOriginalURLExist) {
 
-			shortURLExist, err = getExistShortURL(key, db, ctx)
+			shortURLExist, err = getExistShortURL(ctx, key, db)
 			if err != nil {
 				return "", fmt.Errorf("failed getExistShortURL: %w", err)
 			}
@@ -55,9 +55,9 @@ func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, db *sql.DB,
 			return "", err
 		}
 
-	} else if f != nil {
+	} else if file != nil {
 
-		if err := saveFile(m.Data, f); err != nil {
+		if err := saveFile(m.Data, file); err != nil {
 			return "", err
 		}
 	}
@@ -67,7 +67,7 @@ func (m *StringMap) InsertShortURL(key, shortURL string, f *os.File, db *sql.DB,
 	return "", nil
 }
 
-func (m *StringMap) InsertShortURLMass(values map[string]string, f *os.File, bd *sql.DB, ctx context.Context) error {
+func (m *StringMap) InsertShortURLMass(ctx context.Context, values map[string]string, db *sql.DB, file *os.File) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -78,15 +78,15 @@ func (m *StringMap) InsertShortURLMass(values map[string]string, f *os.File, bd 
 		(m.Data)[short] = full
 	}
 
-	if bd != nil {
+	if db != nil {
 		for short, full := range values {
-			if err := saveToDB(short, full, bd, ctx); err != nil {
+			if err := saveToDB(ctx, short, full, db); err != nil {
 				return err
 			}
 		}
-	} else if f != nil {
+	} else if file != nil {
 
-		if err := saveFile(m.Data, f); err != nil {
+		if err := saveFile(m.Data, file); err != nil {
 			return err
 		}
 	}
@@ -119,14 +119,14 @@ func saveFile(data TData, f *os.File) error {
 	return nil
 }
 
-func saveToDB(shortURL, key string, db *sql.DB, ctx context.Context) error {
+func saveToDB(ctx context.Context, shortURL, key string, db *sql.DB) error {
 	query := `INSERT INTO tdata (shorturl, originalurl) VALUES ($1, $2) ON CONFLICT (originalurl) DO NOTHING RETURNING id`
 	var newID int
 	err := db.QueryRowContext(ctx, query, shortURL, key).Scan(&newID)
 
 	switch {
 	case err == sql.ErrNoRows:
-		return ErrOriginalURLExist
+		return fmt.Errorf("url already exists: %s: %w", shortURL, ErrOriginalURLExist)
 
 	case err != nil:
 		return fmt.Errorf("failed to insert URL: %w", err)
@@ -170,7 +170,7 @@ func ReadDB(db *sql.DB) (data TData, err error) {
 	return data, nil
 }
 
-func getExistShortURL(originalURL string, db *sql.DB, ctx context.Context) (shortURL string, err error) {
+func getExistShortURL(ctx context.Context, originalURL string, db *sql.DB) (shortURL string, err error) {
 	querySel := `SELECT shorturl FROM tdata WHERE originalurl = $1`
 	row := db.QueryRowContext(ctx, querySel, originalURL)
 
@@ -181,4 +181,14 @@ func getExistShortURL(originalURL string, db *sql.DB, ctx context.Context) (shor
 	}
 
 	return shortURLExist, nil
+}
+
+func CheckExistShortURL(ctx context.Context, shortURL string, db *sql.DB) (int, error) {
+	var count int
+	row := db.QueryRowContext(ctx, "SELECT COUNT(*) as count FROM tdata WHERE shorturl = $1", shortURL)
+	err := row.Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed queryrow, err: %w", err)
+	}
+	return count, nil
 }

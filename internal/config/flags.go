@@ -32,14 +32,14 @@ func ParseFlags(cfg *Cnfg) {
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
 
-	if envServAddr, _ := os.LookupEnv("SERVER_ADDRESS"); envServAddr != "" {
+	if envServAddr, exist := os.LookupEnv("SERVER_ADDRESS"); exist {
 		cfg.ServRunAddr = envServAddr
 	}
-	if envAddrForURL, _ := os.LookupEnv("BASE_URL"); envAddrForURL != "" {
+	if envAddrForURL, exist := os.LookupEnv("BASE_URL"); exist {
 		cfg.AddrForURL = envAddrForURL
 	}
 
-	if envStoragePath, _ := os.LookupEnv("FILE_STORAGE_PATH"); envStoragePath != "" {
+	if envStoragePath, exist := os.LookupEnv("FILE_STORAGE_PATH"); exist {
 		cfg.StoragePath = envStoragePath
 	}
 
@@ -52,7 +52,7 @@ func ParseFlags(cfg *Cnfg) {
 		cfg.StoragePath = filepath.Join(path, "Iter9")
 	}
 
-	if envDataBaseDsn, _ := os.LookupEnv("DATABASE_DSN"); envDataBaseDsn != "" {
+	if envDataBaseDsn, exist := os.LookupEnv("DATABASE_DSN"); exist {
 		cfg.DataBaseDsn = envDataBaseDsn
 	}
 }

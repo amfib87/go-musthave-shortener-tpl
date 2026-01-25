@@ -11,20 +11,22 @@ import (
 	"math/rand"
 	"os"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/repository"
 )
 
 const maxRetries = 5
 
-func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
+func InitMap(st URLStorage) (*model.StringMap, error) {
 	stringMap := &model.StringMap{
 		Data: make(model.TData),
 	}
 
-	if file != nil {
+	if st.File != nil {
 
-		reader := bufio.NewReader(file)
+		reader := bufio.NewReader(st.File)
 		data, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed read data from file: %w", err)
@@ -36,8 +38,8 @@ func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
 			}
 		}
 
-	} else if db != nil {
-		dataDB, err := model.ReadDB(db)
+	} else if st.Db != nil {
+		dataDB, err := model.ReadDB(st.Db)
 		if err != nil {
 			return nil, fmt.Errorf("failed read DB: %v", err)
 		}
@@ -47,21 +49,21 @@ func InitMap(file *os.File, db *sql.DB) (*model.StringMap, error) {
 	return stringMap, nil
 }
 
-func GetShortURL(key string, m *model.StringMap, f *os.File, db *sql.DB, lg *logger.TLog, ctx context.Context) (string, error) {
+func GetShortURL(ctx context.Context, key string, m *model.StringMap, st URLStorage, lg *logger.TLog) (string, error) {
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
 		lg.Lg.Sugar().Infoln("key, shortURL:", key, shortURL)
-		shortURLExist, err := m.InsertShortURL(key, shortURL, f, db, ctx)
+		shortURLExist, err := m.InsertShortURL(ctx, key, shortURL, st.File, st.Db)
 		if err == nil {
 			lg.Lg.Sugar().Infoln("error is empty")
 		} else {
 			lg.Lg.Sugar().Infoln("error with InsertShortURL:", err.Error())
 		}
 
-		if err == model.ErrOriginalURLExist {
+		if errors.Is(err, model.ErrOriginalURLExist) {
 			return shortURLExist, err
 		}
 		if err == nil {
@@ -102,7 +104,7 @@ func FileClose(file *os.File, lg *logger.TLog) {
 	}
 }
 
-func GetShortURLMass(values []model.DataRequestMass, m *model.StringMap, f *os.File, db *sql.DB, ctx context.Context) ([]model.DataAnswerMass, error) {
+func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *model.StringMap, st URLStorage) ([]model.DataAnswerMass, error) {
 	export := []model.DataAnswerMass{}
 	shortKeys := make(map[string]string)
 
@@ -111,11 +113,9 @@ func GetShortURLMass(values []model.DataRequestMass, m *model.StringMap, f *os.F
 			shortURL := generateShortID()
 
 			// проверяем на наличие сгенерированного shorturl
-			var count int
-			row := db.QueryRowContext(ctx, "SELECT COUNT(*) as count FROM tdata WHERE shorturl = $1", shortURL)
-			err := row.Scan(&count)
+			count, err := model.CheckExistShortURL(ctx, shortURL, st.Db)
 			if err != nil {
-				return nil, fmt.Errorf("failed queryrow, err: %w", err)
+				return nil, fmt.Errorf("CheckExistShortURL, err: %w", err)
 			}
 			if count != 0 {
 				continue
@@ -131,9 +131,46 @@ func GetShortURLMass(values []model.DataRequestMass, m *model.StringMap, f *os.F
 		return nil, fmt.Errorf("failed to compose unique short URL after %d attempts", maxRetries)
 	}
 
-	if err := m.InsertShortURLMass(shortKeys, f, db, ctx); err != nil {
+	if err := m.InsertShortURLMass(ctx, shortKeys, st.Db, st.File); err != nil {
 		return nil, fmt.Errorf("failed insertShortURLMass, err: %w", err)
 	}
 
 	return export, nil
+}
+
+type URLStorage struct {
+	Db   *sql.DB
+	File *os.File
+}
+
+func InitURLStorage(cfg *config.Cnfg, log *logger.TLog) (URLStorage, error) {
+	URLstorage := URLStorage{}
+	var err error
+
+	if cfg.DataBaseDsn != "" {
+		URLstorage.Db, err = repository.InitDB(cfg.DataBaseDsn)
+		if err != nil {
+			log.Lg.Sugar().Fatalf("failed InitDB: %v", err)
+			return URLstorage, err
+		}
+
+	} else if cfg.StoragePath != "" {
+		URLstorage.File, err = InitFile(cfg.StoragePath)
+		if err != nil {
+			log.Lg.Sugar().Fatalf("failed to init file: %v", err)
+			return URLstorage, err
+		}
+	}
+
+	return URLstorage, nil
+}
+
+func (st URLStorage) Close(log *logger.TLog) {
+	if st.Db != nil {
+		defer st.Db.Close()
+	}
+	if st.File != nil {
+		defer FileClose(st.File, log)
+	}
+
 }
