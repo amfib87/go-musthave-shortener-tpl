@@ -38,8 +38,8 @@ func InitMap(st URLStorage) (*model.StringMap, error) {
 			}
 		}
 
-	} else if st.Db != nil {
-		dataDB, err := model.ReadDB(st.Db)
+	} else if st.DB != nil {
+		dataDB, err := model.ReadDB(st.DB)
 		if err != nil {
 			return nil, fmt.Errorf("failed read DB: %v", err)
 		}
@@ -56,7 +56,7 @@ func GetShortURL(ctx context.Context, key string, m *model.StringMap, st URLStor
 		shortURL := generateShortID()
 
 		lg.Lg.Sugar().Infoln("key, shortURL:", key, shortURL)
-		shortURLExist, err := m.InsertShortURL(ctx, key, shortURL, st.File, st.Db)
+		shortURLExist, err := m.InsertShortURL(ctx, key, shortURL, st.File, st.DB)
 		if err == nil {
 			lg.Lg.Sugar().Infoln("error is empty")
 		} else {
@@ -113,7 +113,7 @@ func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *mod
 			shortURL := generateShortID()
 
 			// проверяем на наличие сгенерированного shorturl
-			count, err := model.CheckExistShortURL(ctx, shortURL, st.Db)
+			count, err := model.CheckExistShortURL(ctx, shortURL, st.DB)
 			if err != nil {
 				return nil, fmt.Errorf("CheckExistShortURL, err: %w", err)
 			}
@@ -131,7 +131,7 @@ func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *mod
 		return nil, fmt.Errorf("failed to compose unique short URL after %d attempts", maxRetries)
 	}
 
-	if err := m.InsertShortURLMass(ctx, shortKeys, st.Db, st.File); err != nil {
+	if err := m.InsertShortURLMass(ctx, shortKeys, st.DB, st.File); err != nil {
 		return nil, fmt.Errorf("failed insertShortURLMass, err: %w", err)
 	}
 
@@ -139,7 +139,7 @@ func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *mod
 }
 
 type URLStorage struct {
-	Db   *sql.DB
+	DB   *sql.DB
 	File *os.File
 }
 
@@ -148,7 +148,7 @@ func InitURLStorage(cfg *config.Cnfg, log *logger.TLog) (URLStorage, error) {
 	var err error
 
 	if cfg.DataBaseDsn != "" {
-		URLstorage.Db, err = repository.InitDB(cfg.DataBaseDsn)
+		URLstorage.DB, err = repository.InitDB(cfg.DataBaseDsn)
 		if err != nil {
 			log.Lg.Sugar().Fatalf("failed InitDB: %v", err)
 			return URLstorage, err
@@ -166,8 +166,8 @@ func InitURLStorage(cfg *config.Cnfg, log *logger.TLog) (URLStorage, error) {
 }
 
 func (st URLStorage) Close(log *logger.TLog) {
-	if st.Db != nil {
-		defer st.Db.Close()
+	if st.DB != nil {
+		defer st.DB.Close()
 	}
 	if st.File != nil {
 		defer FileClose(st.File, log)

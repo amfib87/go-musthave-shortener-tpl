@@ -254,7 +254,7 @@ func (hndl *Handler) TimeoutMiddleware(h http.Handler) http.Handler {
 }
 
 func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
-	if er := hndl.URLSt.Db.PingContext(req.Context()); er != nil {
+	if er := hndl.URLSt.DB.PingContext(req.Context()); er != nil {
 		hndl.Logger.Lg.Error("failed PingContext", zap.Error(er))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
