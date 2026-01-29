@@ -29,35 +29,15 @@ func run() error {
 	cfg := config.NewConfig()
 	config.ParseFlags(cfg)
 
-	URLStorage, err := service.InitURLStorage(cfg, logger)
+	urlStorage, err := service.InitURLStorage(cfg, logger)
 	if err != nil {
-		logger.Lg.Error("failed InitURLStorage: %s", zap.Error(err))
+		logger.Lg.Error("failed IniturlStorage: %s", zap.Error(err))
 		return err
 	}
-	defer URLStorage.Close(logger)
-
-	// var db *sql.DB
-	// var file *os.File
-
-	// if cfg.DataBaseDsn != "" {
-	// 	db, err = repository.InitDB(cfg.DataBaseDsn)
-	// 	if err != nil {
-	// 		logger.Lg.Sugar().Fatalf("failed InitDB: %v", err)
-	// 		return err
-	// 	}
-	// 	defer db.Close()
-
-	// } else if cfg.StoragePath != "" {
-	// 	file, err = service.InitFile(cfg.StoragePath)
-	// 	if err != nil {
-	// 		logger.Lg.Sugar().Fatalf("failed to init file: %v", err)
-	// 		return err
-	// 	}
-	// 	defer service.FileClose(file, logger)
-	// }
+	defer urlStorage.Close(logger)
 
 	// Инициализируем маршрутизатор с конфигурацией
-	router, err := router.Init(cfg, logger, URLStorage)
+	router, err := router.Init(cfg, logger, urlStorage)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed to init router: %v", err)
 		return err

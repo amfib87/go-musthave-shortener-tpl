@@ -22,7 +22,7 @@ type Handler struct {
 	cfg    *config.Cnfg
 	mapURL *model.StringMap
 	Logger *logger.TLog
-	URLSt  service.URLStorage
+	urlSt  service.URLStorage
 }
 
 func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (h *Handler, err error) {
@@ -35,7 +35,7 @@ func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (h *Ha
 		cfg:    cfg,
 		mapURL: data,
 		Logger: lg,
-		URLSt:  st,
+		urlSt:  st,
 	}, nil
 }
 
@@ -52,7 +52,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	shortURL, err := service.GetShortURL(req.Context(), URL, hndl.mapURL, hndl.URLSt, hndl.Logger)
+	shortURL, err := service.GetShortURL(req.Context(), URL, hndl.mapURL, hndl.urlSt, hndl.Logger)
 	if err == model.ErrOriginalURLExist {
 		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
 
@@ -159,7 +159,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	dataAnsw.ShortURL, err = service.GetShortURL(req.Context(), dataReq.URL, hndl.mapURL, hndl.URLSt, hndl.Logger)
+	dataAnsw.ShortURL, err = service.GetShortURL(req.Context(), dataReq.URL, hndl.mapURL, hndl.urlSt, hndl.Logger)
 
 	if errors.Is(err, model.ErrOriginalURLExist) {
 		hndl.Logger.Lg.Sugar().Debugln("error GetShortURL: %v", err.Error())
@@ -254,7 +254,7 @@ func (hndl *Handler) TimeoutMiddleware(h http.Handler) http.Handler {
 }
 
 func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
-	if er := hndl.URLSt.DB.PingContext(req.Context()); er != nil {
+	if er := hndl.urlSt.DB.PingContext(req.Context()); er != nil {
 		hndl.Logger.Lg.Error("failed PingContext", zap.Error(er))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -279,7 +279,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.URLSt)
+	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt)
 	if err != nil {
 		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
