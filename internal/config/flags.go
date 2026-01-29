@@ -10,6 +10,7 @@ type Cnfg struct {
 	ServRunAddr string
 	AddrForURL  string
 	StoragePath string
+	DataBaseDsn string
 }
 
 func NewConfig() *Cnfg {
@@ -17,6 +18,7 @@ func NewConfig() *Cnfg {
 		ServRunAddr: "",
 		AddrForURL:  "",
 		StoragePath: "",
+		DataBaseDsn: "",
 	}
 }
 
@@ -26,17 +28,18 @@ func ParseFlags(cfg *Cnfg) {
 	flag.StringVar(&cfg.ServRunAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&cfg.AddrForURL, "b", "", "address to short URL")
 	flag.StringVar(&cfg.StoragePath, "f", "", "path file for storage")
+	flag.StringVar(&cfg.DataBaseDsn, "d", "", "address BD")
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
 
-	if envServAddr, _ := os.LookupEnv("SERVER_ADDRESS"); envServAddr != "" {
+	if envServAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		cfg.ServRunAddr = envServAddr
 	}
-	if envAddrForURL, _ := os.LookupEnv("BASE_URL"); envAddrForURL != "" {
+	if envAddrForURL, ok := os.LookupEnv("BASE_URL"); ok {
 		cfg.AddrForURL = envAddrForURL
 	}
 
-	if envStoragePath, _ := os.LookupEnv("FILE_STORAGE_PATH"); envStoragePath != "" {
+	if envStoragePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		cfg.StoragePath = envStoragePath
 	}
 
@@ -47,5 +50,9 @@ func ParseFlags(cfg *Cnfg) {
 		}
 
 		cfg.StoragePath = filepath.Join(path, "Iter9")
+	}
+
+	if envDataBaseDsn, ok := os.LookupEnv("DATABASE_DSN"); ok {
+		cfg.DataBaseDsn = envDataBaseDsn
 	}
 }
