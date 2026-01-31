@@ -59,13 +59,13 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	userID, ok := req.Context().Value("userID").(string)
-	if !ok {
-		// Если userID не найден или не строка — это ошибка аутентификации
-		hndl.Logger.Lg.Error("failed get userID from context")
-		http.Error(res, "User ID not found in context", http.StatusInternalServerError)
-		return
-	}
+	userID, _ := req.Context().Value(userIDKey).(string)
+	// if !ok {
+	// 	// Если userID не найден или не строка — это ошибка аутентификации
+	// 	hndl.Logger.Lg.Error("failed get userID from context")
+	// 	http.Error(res, "User ID not found in context", http.StatusInternalServerError)
+	// 	return
+	// }
 	dataRow.UserID = userID
 
 	shortURL, err := service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
@@ -176,13 +176,13 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID, ok := req.Context().Value("userID").(string)
-	if !ok {
-		// Если userID не найден или не строка — это ошибка аутентификации
-		hndl.Logger.Lg.Error("failed get userID from context")
-		http.Error(res, "User ID not found in context", http.StatusInternalServerError)
-		return
-	}
+	userID, _ := req.Context().Value(userIDKey).(string)
+	// if !ok {
+	// 	// Если userID не найден или не строка — это ошибка аутентификации
+	// 	hndl.Logger.Lg.Error("failed get userID from context")
+	// 	http.Error(res, "User ID not found in context", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	dataRow := model.DataRow{
 		URL:    dataReq.URL,
@@ -310,13 +310,13 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID, ok := req.Context().Value("userID").(string)
-	if !ok {
-		// Если userID не найден или не строка — это ошибка аутентификации
-		hndl.Logger.Lg.Error("failed get userID from context")
-		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+	userID, _ := req.Context().Value(userIDKey).(string)
+	// if !ok {
+	// 	// Если userID не найден или не строка — это ошибка аутентификации
+	// 	hndl.Logger.Lg.Error("failed get userID from context")
+	// 	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt, userID)
 	if err != nil {
@@ -356,13 +356,13 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
 	hndl.Logger.Lg.Info("started GetAllURLsHandle")
 
-	userID, ok := req.Context().Value("userID").(string)
-	if !ok {
-		// Если userID не найден или не строка — это ошибка аутентификации
-		hndl.Logger.Lg.Error("failed get userID from context")
-		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+	userID, _ := req.Context().Value(userIDKey).(string)
+	// if !ok {
+	// 	// Если userID не найден или не строка — это ошибка аутентификации
+	// 	hndl.Logger.Lg.Error("failed get userID from context")
+	// 	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// hndl.Logger.Lg.Info("userID", zap.Any("userID", userID))
 	// hndl.Logger.Lg.Info("hndl.mapURL", zap.Any("hndl.mapURL", hndl.mapURL))
@@ -394,6 +394,7 @@ func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Reques
 }
 
 const cookieMaxAge = 86400 // 1 день
+const userIDKey model.ContextKey = "userID"
 
 func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -465,7 +466,7 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 			})
 		}
 
-		ctx := context.WithValue(req.Context(), "userID", cl.UserID)
+		ctx := context.WithValue(req.Context(), userIDKey, cl.UserID)
 		if next == nil {
 			hndl.Logger.Lg.Error("AuthCookieMiddleware: next handler is nil")
 			http.Error(res, "Internal Server Error", http.StatusInternalServerError)

@@ -43,6 +43,8 @@ type AllURLAnswer struct {
 	OrigURL  string `json:"original_url"`
 }
 
+type ContextKey string
+
 const SecretKey = "secret_key"
 
 func (m *StringMap) InsertShortURL(ctx context.Context, data DataRow, shortURL string, file *os.File, db *sql.DB) (shortURLExist string, err error) {
