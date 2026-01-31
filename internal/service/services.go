@@ -3,13 +3,17 @@ package service
 import (
 	"bufio"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
+	"strings"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -18,6 +22,7 @@ import (
 )
 
 const maxRetries = 5
+const CookieName = "user_auth"
 
 func InitMap(st URLStorage) (*model.StringMap, error) {
 	stringMap := &model.StringMap{
@@ -49,14 +54,14 @@ func InitMap(st URLStorage) (*model.StringMap, error) {
 	return stringMap, nil
 }
 
-func GetShortURL(ctx context.Context, key string, m *model.StringMap, st URLStorage, lg *logger.TLog) (string, error) {
+func GetShortURL(ctx context.Context, data model.DataRow, m *model.StringMap, st URLStorage, lg *logger.TLog) (string, error) {
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
-		lg.Lg.Sugar().Infoln("key, shortURL:", key, shortURL)
-		shortURLExist, err := m.InsertShortURL(ctx, key, shortURL, st.File, st.DB)
+		lg.Lg.Sugar().Infoln("key, shortURL, userID:", data.URL, shortURL, data.UserID)
+		shortURLExist, err := m.InsertShortURL(ctx, data, shortURL, st.File, st.DB)
 		if err == nil {
 			lg.Lg.Sugar().Infoln("error is empty")
 		} else {
@@ -104,9 +109,9 @@ func FileClose(file *os.File, lg *logger.TLog) {
 	}
 }
 
-func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *model.StringMap, st URLStorage) ([]model.DataAnswerMass, error) {
+func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *model.StringMap, st URLStorage, userID string) ([]model.DataAnswerMass, error) {
 	export := []model.DataAnswerMass{}
-	shortKeys := make(map[string]string)
+	shortKeys := make(model.TData)
 
 	for _, lineData := range values {
 		for attempt := 0; attempt < maxRetries; attempt++ {
@@ -121,7 +126,9 @@ func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *mod
 				continue
 			}
 
-			shortKeys[shortURL] = lineData.OriginalURL
+			shortKeys[shortURL] = model.DataRow{
+				URL:    lineData.OriginalURL,
+				UserID: userID}
 			export = append(export, model.DataAnswerMass{CorrelationID: lineData.CorrelationID, ShortURL: shortURL})
 			break
 		}
@@ -174,3 +181,39 @@ func (st URLStorage) Close(log *logger.TLog) {
 	}
 
 }
+
+func VerifyCookieValue(value string) (string, bool) {
+	parts := strings.Split(value, ":")
+
+	if len(parts) != 2 {
+		return "", false
+	}
+
+	userID, signature := parts[0], parts[1]
+	expectedSignature := SignUserID(userID)
+	expectedParts := strings.Split(expectedSignature, ":")
+
+	return userID, signature == expectedParts[1]
+}
+
+func SignUserID(userID string) string {
+
+	h := hmac.New(sha256.New, []byte(model.SecretKey))
+	h.Write([]byte(userID))
+	signature := hex.EncodeToString(h.Sum(nil))
+	return userID + ":" + signature
+}
+
+// func GetAndCheckUserID(r *http.Request) (string, error) {
+// 	cookie, err := r.Cookie(CookieName)
+// 	if err != nil || cookie.Value == "" {
+// 		return "", err
+// 	}
+
+// 	userID, valid := VerifyCookieValue(cookie.Value)
+// 	if !valid {
+// 		return "", fmt.Errorf("cookie.value isn't valid")
+// 	}
+
+// 	return userID, nil
+// }

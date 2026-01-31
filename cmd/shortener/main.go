@@ -28,6 +28,7 @@ func run() error {
 	// обрабатываем аргументы командной строки
 	cfg := config.NewConfig()
 	config.ParseFlags(cfg)
+	logger.Lg.Info("cfg", zap.Any("cfg", cfg))
 
 	urlStorage, err := service.InitURLStorage(cfg, logger)
 	if err != nil {

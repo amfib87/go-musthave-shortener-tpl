@@ -30,6 +30,7 @@ func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (*Router, er
 	r.chi.Use(h.Logger.RequestLogger)
 	r.chi.Use(h.GzipMiddleware)
 	r.chi.Use(h.TimeoutMiddleware)
+	r.chi.Use(h.AuthCookieMiddleware)
 
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", h.IDGetHandler)
@@ -37,6 +38,7 @@ func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (*Router, er
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
 	r.chi.Get("/ping", h.GetPing)
 	r.chi.Post("/{api}/{shorten}/{batch}", h.PostMassURLHandler)
+	r.chi.Get("/{api}/{user}/{urls}", h.GetAllURLsHandler)
 	return r, nil
 }
 
