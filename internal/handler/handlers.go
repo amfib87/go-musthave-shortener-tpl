@@ -59,8 +59,14 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	userID := req.Context().Value(userIDKey).(string)
-	dataRow.UserID = userID
+	valUserID := req.Context().Value(userIDKey)
+	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
+	if valUserID != nil {
+		userID := valUserID.(string)
+		dataRow.UserID = userID
+	} else {
+		dataRow.UserID = "unknown"
+	}
 
 	shortURL, err := service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
 	if err == model.ErrOriginalURLExist {
@@ -170,7 +176,15 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID := req.Context().Value(userIDKey).(string)
+	var userID string
+	valUserID := req.Context().Value(userIDKey)
+	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
+	if valUserID != nil {
+		userID = valUserID.(string)
+	} else {
+		userID = "unknown"
+	}
+
 	dataRow := model.DataRow{
 		URL:    dataReq.URL,
 		UserID: userID}
@@ -299,7 +313,15 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID := req.Context().Value(userIDKey).(string)
+	var userID string
+	valUserID := req.Context().Value(userIDKey)
+	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
+	if valUserID != nil {
+		userID = valUserID.(string)
+	} else {
+		userID = "unknown"
+	}
+
 	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt, userID)
 	if err != nil {
 		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
