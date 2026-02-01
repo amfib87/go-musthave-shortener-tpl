@@ -59,13 +59,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	userID, _ := req.Context().Value(userIDKey).(string)
-	// if !ok {
-	// 	// Если userID не найден или не строка — это ошибка аутентификации
-	// 	hndl.Logger.Lg.Error("failed get userID from context")
-	// 	http.Error(res, "User ID not found in context", http.StatusInternalServerError)
-	// 	return
-	// }
+	userID := req.Context().Value(userIDKey).(string)
 	dataRow.UserID = userID
 
 	shortURL, err := service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
@@ -176,14 +170,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID, _ := req.Context().Value(userIDKey).(string)
-	// if !ok {
-	// 	// Если userID не найден или не строка — это ошибка аутентификации
-	// 	hndl.Logger.Lg.Error("failed get userID from context")
-	// 	http.Error(res, "User ID not found in context", http.StatusInternalServerError)
-	// 	return
-	// }
-
+	userID := req.Context().Value(userIDKey).(string)
 	dataRow := model.DataRow{
 		URL:    dataReq.URL,
 		UserID: userID}
@@ -259,6 +246,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 		}
 
 		contentEncoding := req.Header.Get("Content-Encoding")
+		hndl.Logger.Lg.Info("contentEncoding ", zap.String("resTimeout == nicontentEncoding l", contentEncoding))
 		if strings.Contains(contentEncoding, "gzip") {
 			newReader, err := gz.NewCompressReader(req.Body)
 			if err != nil {
@@ -266,6 +254,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			hndl.Logger.Lg.Info("newReader", zap.Any("newReader", newReader))
 			req.Body = newReader
 			defer newReader.Close()
 		}
@@ -310,14 +299,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	userID, _ := req.Context().Value(userIDKey).(string)
-	// if !ok {
-	// 	// Если userID не найден или не строка — это ошибка аутентификации
-	// 	hndl.Logger.Lg.Error("failed get userID from context")
-	// 	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	// 	return
-	// }
-
+	userID := req.Context().Value(userIDKey).(string)
 	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt, userID)
 	if err != nil {
 		hndl.Logger.Lg.Error("error GetShortURL:", zap.Error(err))
@@ -356,30 +338,38 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
 	hndl.Logger.Lg.Info("started GetAllURLsHandle")
 
-	userID, _ := req.Context().Value(userIDKey).(string)
-	// if !ok {
-	// 	// Если userID не найден или не строка — это ошибка аутентификации
-	// 	hndl.Logger.Lg.Error("failed get userID from context")
-	// 	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	// 	return
-	// }
+	userID := req.Context().Value(userIDKey).(string)
 
-	// hndl.Logger.Lg.Info("userID", zap.Any("userID", userID))
-	// hndl.Logger.Lg.Info("hndl.mapURL", zap.Any("hndl.mapURL", hndl.mapURL))
 	allURLs := hndl.mapURL.GetAllURLsForUser(userID)
 	if len(allURLs) == 0 {
 		hndl.Logger.Lg.Error("didn't find URLs for userID")
 		res.WriteHeader(http.StatusNoContent)
 		res.Write([]byte(""))
 		return
+	} else {
+		hndl.Logger.Lg.Info("allURLs", zap.Any("allURLs", allURLs))
+	}
+
+	baseURL := hndl.cfg.AddrForURL
+	if baseURL == "" {
+		baseURL = "http://" + req.Host
 	}
 
 	allURLsAnswer := []model.AllURLAnswer{}
 	for short, full := range allURLs {
+		shortExp := short
+		shortExp, err := url.JoinPath(baseURL, "/", shortExp)
+		if err != nil {
+			hndl.Logger.Lg.Error("failed to compose the shortened URL:", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		allURLsAnswer = append(allURLsAnswer, model.AllURLAnswer{
-			ShortURL: short,
+			ShortURL: shortExp,
 			OrigURL:  full})
 	}
+	hndl.Logger.Lg.Info("allURLsAnswer", zap.Any("allURLsAnswer", allURLsAnswer))
 
 	resp, err := json.Marshal(allURLsAnswer)
 	if err != nil {
@@ -388,8 +378,10 @@ func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	hndl.Logger.Lg.Info("Все найденные URL", zap.String("resp", string(resp)))
+
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusCreated)
+	res.WriteHeader(http.StatusOK)
 	res.Write(resp)
 }
 
@@ -404,9 +396,6 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 			UserID string `json:"user_id"`
 			jwt.RegisteredClaims
 		}
-
-		usrID := req.Header
-		hndl.Logger.Lg.Info("usrID", zap.Any("usrID", usrID))
 
 		cl := Claims{}
 		cookie, err := req.Cookie(service.CookieName)
@@ -447,7 +436,7 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, cl)
 			tokenString, err := token.SignedString([]byte(model.SecretKey))
 			if err != nil {
-				hndl.Logger.Lg.Info("failed to create token", zap.Error(err))
+				hndl.Logger.Lg.Error("failed to create token", zap.Error(err))
 				http.Error(res, "Failed to create token", http.StatusInternalServerError)
 				return
 			}
@@ -460,11 +449,12 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 				Path:     "/",
 				MaxAge:   cookieMaxAge,
 				Expires:  expiresAt,
-				Secure:   true, // только HTTPS
-				HttpOnly: true, // защита от XSS
 				SameSite: http.SameSiteLaxMode,
 			})
 		}
+
+		hd := res.Header()
+		hndl.Logger.Lg.Info("header", zap.Any("hd", hd))
 
 		ctx := context.WithValue(req.Context(), userIDKey, cl.UserID)
 		if next == nil {

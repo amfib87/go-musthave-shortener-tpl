@@ -3,17 +3,13 @@ package service
 import (
 	"bufio"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
-	"strings"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -181,39 +177,3 @@ func (st URLStorage) Close(log *logger.TLog) {
 	}
 
 }
-
-func VerifyCookieValue(value string) (string, bool) {
-	parts := strings.Split(value, ":")
-
-	if len(parts) != 2 {
-		return "", false
-	}
-
-	userID, signature := parts[0], parts[1]
-	expectedSignature := SignUserID(userID)
-	expectedParts := strings.Split(expectedSignature, ":")
-
-	return userID, signature == expectedParts[1]
-}
-
-func SignUserID(userID string) string {
-
-	h := hmac.New(sha256.New, []byte(model.SecretKey))
-	h.Write([]byte(userID))
-	signature := hex.EncodeToString(h.Sum(nil))
-	return userID + ":" + signature
-}
-
-// func GetAndCheckUserID(r *http.Request) (string, error) {
-// 	cookie, err := r.Cookie(CookieName)
-// 	if err != nil || cookie.Value == "" {
-// 		return "", err
-// 	}
-
-// 	userID, valid := VerifyCookieValue(cookie.Value)
-// 	if !valid {
-// 		return "", fmt.Errorf("cookie.value isn't valid")
-// 	}
-
-// 	return userID, nil
-// }
