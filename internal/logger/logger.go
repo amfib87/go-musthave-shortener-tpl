@@ -3,7 +3,6 @@ package logger
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -54,7 +53,7 @@ func (r *LoggingResponseWriter) WriteHeader(statusCode int) {
 
 func (lg *TLog) RequestLogger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		// start := time.Now()
 
 		responseData := &ResponseData{
 			Status: 0,
@@ -67,14 +66,14 @@ func (lg *TLog) RequestLogger(h http.Handler) http.Handler {
 
 		h.ServeHTTP(&lw, r)
 
-		duration := time.Since(start)
+		// duration := time.Since(start)
 
-		lg.Lg.Sugar().Infoln(
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.Status,
-			"duration", duration,
-			"size", responseData.Size,
-		)
+		// lg.Lg.Sugar().Infoln(
+		// 	"uri", r.RequestURI,
+		// 	"method", r.Method,
+		// 	"status", responseData.Status,
+		// 	"duration", duration,
+		// 	"size", responseData.Size,
+		// )
 	})
 }

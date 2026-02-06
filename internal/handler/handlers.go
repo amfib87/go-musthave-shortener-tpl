@@ -118,6 +118,8 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 }
 
 func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
+	hndl.Logger.Lg.Info("started IDGetHandler")
+
 	if req.URL.Path == "" {
 		http.Error(res, "id is empty", http.StatusBadRequest)
 		return
@@ -129,6 +131,15 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	var userID string
+	valUserID := req.Context().Value(userIDKey)
+	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
+	if valUserID != nil {
+		userID = valUserID.(string)
+	} else {
+		userID = "unknown"
+	}
+
 	dataRow, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
 		hndl.Logger.Lg.Error("500 Internal Error: %v", zap.Error(err))
@@ -138,6 +149,16 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	if dataRow.URL == "" {
 		hndl.Logger.Lg.Sugar().Infoln("id не найдено")
 		http.Error(res, "id не найдено", http.StatusNotFound)
+		return
+	}
+
+	hndl.Logger.Lg.Info("dataRow.IsDeleted", zap.Any("dataRow.IsDeleted", dataRow.IsDeleted))
+	hndl.Logger.Lg.Info("dataRow.UserID", zap.Any("dataRow.UserID", dataRow.UserID))
+	hndl.Logger.Lg.Info("userID", zap.Any("userID", userID))
+
+	if dataRow.IsDeleted && dataRow.UserID == userID {
+		hndl.Logger.Lg.Sugar().Infoln("short URL is deleted")
+		res.WriteHeader(http.StatusGone)
 		return
 	}
 
@@ -260,7 +281,6 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 		}
 
 		contentEncoding := req.Header.Get("Content-Encoding")
-		hndl.Logger.Lg.Info("contentEncoding ", zap.String("resTimeout == nicontentEncoding l", contentEncoding))
 		if strings.Contains(contentEncoding, "gzip") {
 			newReader, err := gz.NewCompressReader(req.Body)
 			if err != nil {
@@ -475,9 +495,6 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 			})
 		}
 
-		hd := res.Header()
-		hndl.Logger.Lg.Info("header", zap.Any("hd", hd))
-
 		ctx := context.WithValue(req.Context(), userIDKey, cl.UserID)
 		if next == nil {
 			hndl.Logger.Lg.Error("AuthCookieMiddleware: next handler is nil")
@@ -486,4 +503,40 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(res, req.WithContext(ctx))
 	})
+}
+
+func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Request) {
+	hndl.Logger.Lg.Info("started DelShortURLsHandler")
+
+	userID := req.Context().Value(userIDKey).(string)
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		hndl.Logger.Lg.Error("short urls is required", zap.Error(err))
+		http.Error(res, "short urls is required", http.StatusBadRequest)
+		return
+	}
+
+	var shortURL []model.ShortURL
+	if err := json.Unmarshal(buf.Bytes(), &shortURL); err != nil {
+		hndl.Logger.Lg.Error("wrong json", zap.Error(err))
+		http.Error(res, "wrong json", http.StatusBadRequest)
+		return
+	}
+
+	if len(shortURL) == 0 {
+		hndl.Logger.Lg.Error("list of short urls is empty")
+		http.Error(res, "list of short urls is empty", http.StatusBadRequest)
+		return
+	}
+
+	go func() {
+		if err := service.DelShortURLs(shortURL, userID, hndl.urlSt, hndl.mapURL); err != nil {
+			hndl.Logger.Lg.Error("failed DelShortURLs", zap.Error(err))
+		}
+	}()
+
+	res.WriteHeader(http.StatusAccepted)
+
 }

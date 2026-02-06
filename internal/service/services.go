@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
+	"sync"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -176,4 +178,38 @@ func (st URLStorage) Close(log *logger.TLog) {
 		defer FileClose(st.File, log)
 	}
 
+}
+
+func DelShortURLs(shortURLs []model.ShortURL, userID string, st URLStorage, data *model.StringMap) error {
+	const batchSize = 10
+	ch := make(chan []string, batchSize)
+
+	go func() {
+		defer close(ch)
+		var ids []string
+		for _, shortURL := range shortURLs {
+			ids = append(ids, string(shortURL)) // предполагается, что поле называется ShortID
+		}
+
+		for i := 0; i < len(ids); i += batchSize {
+			end := i + batchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			ch <- ids[i:end]
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for batch := range ch {
+		wg.Add(1)
+		go func(b []string) {
+			defer wg.Done()
+			if err := model.MarkAsDeleted(b, userID, st.DB, data); err != nil {
+				log.Printf("Failed to mark batch as deleted: %v", err)
+			}
+		}(batch)
+	}
+	wg.Wait()
+	return nil
 }

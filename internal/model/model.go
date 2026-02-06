@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/lib/pq"
 )
 
 type TData map[string]DataRow
@@ -34,8 +36,9 @@ type DataAnswerMass struct {
 }
 
 type DataRow struct {
-	URL    string `json:"url"`
-	UserID string `json:"userid"`
+	URL       string `json:"url"`
+	UserID    string `json:"userid"`
+	IsDeleted bool   `json:"-"`
 }
 
 type AllURLAnswer struct {
@@ -44,6 +47,8 @@ type AllURLAnswer struct {
 }
 
 type ContextKey string
+
+type ShortURL string
 
 const SecretKey = "secret_key"
 
@@ -166,7 +171,7 @@ func saveToDB(ctx context.Context, shortURL string, data DataRow, db *sql.DB) er
 }
 
 func ReadDB(db *sql.DB) (data TData, err error) {
-	query := `SELECT shorturl, originalurl, userID FROM tdata`
+	query := `SELECT shorturl, originalurl, userID, is_deleted FROM tdata`
 	ctx := context.Background()
 
 	rows, err := db.QueryContext(ctx, query)
@@ -180,19 +185,21 @@ func ReadDB(db *sql.DB) (data TData, err error) {
 	// пробегаем по всем записям
 	for rows.Next() {
 		var (
-			shortURL string
-			fullURL  string
-			userID   string
+			shortURL  string
+			fullURL   string
+			userID    string
+			isDeleted bool
 		)
 
-		err = rows.Scan(&shortURL, &fullURL, &userID)
+		err = rows.Scan(&shortURL, &fullURL, &userID, &isDeleted)
 		if err != nil {
 			return nil, err
 		}
 
 		data[shortURL] = DataRow{
-			URL:    fullURL,
-			UserID: userID}
+			URL:       fullURL,
+			UserID:    userID,
+			IsDeleted: isDeleted}
 	}
 
 	// проверяем на ошибки
@@ -224,4 +231,26 @@ func CheckExistShortURL(ctx context.Context, shortURL string, db *sql.DB) (int, 
 		return 0, fmt.Errorf("failed queryrow, err: %w", err)
 	}
 	return count, nil
+}
+
+func MarkAsDeleted(shortURLs []string, userID string, db *sql.DB, data *StringMap) error {
+	query := `UPDATE tdata SET is_deleted = TRUE WHERE shorturl = ANY($1) AND userid = $2`
+	_, err := db.ExecContext(context.Background(), query, pq.Array(shortURLs), userID)
+	if err != nil {
+		return err
+	}
+
+	for _, shortURL := range shortURLs {
+		dataRow, ok := data.Data[shortURL]
+		if !ok {
+			continue
+		}
+
+		if dataRow.UserID == userID {
+			dataRow.IsDeleted = true
+			data.Data[shortURL] = dataRow
+		}
+	}
+
+	return nil
 }

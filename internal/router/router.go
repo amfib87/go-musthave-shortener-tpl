@@ -34,11 +34,14 @@ func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (*Router, er
 
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", h.IDGetHandler)
+	r.chi.Get("/ping", h.GetPing)
+	r.chi.Get("/{api}/{user}/{urls}", h.GetAllURLsHandler)
+
 	r.chi.Post("/", h.PostURLHandler)
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
-	r.chi.Get("/ping", h.GetPing)
 	r.chi.Post("/{api}/{shorten}/{batch}", h.PostMassURLHandler)
-	r.chi.Get("/{api}/{user}/{urls}", h.GetAllURLsHandler)
+
+	r.chi.Delete("/{api}/{user}/{urls}", h.DelShortURLsHandler)
 	return r, nil
 }
 
