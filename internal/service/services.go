@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
+	"sync"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -18,6 +20,7 @@ import (
 )
 
 const maxRetries = 5
+const CookieName = "user_auth"
 
 func InitMap(st URLStorage) (*model.StringMap, error) {
 	stringMap := &model.StringMap{
@@ -49,14 +52,14 @@ func InitMap(st URLStorage) (*model.StringMap, error) {
 	return stringMap, nil
 }
 
-func GetShortURL(ctx context.Context, key string, m *model.StringMap, st URLStorage, lg *logger.TLog) (string, error) {
+func GetShortURL(ctx context.Context, data model.DataRow, m *model.StringMap, st URLStorage, lg *logger.TLog) (string, error) {
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
-		lg.Lg.Sugar().Infoln("key, shortURL:", key, shortURL)
-		shortURLExist, err := m.InsertShortURL(ctx, key, shortURL, st.File, st.DB)
+		lg.Lg.Sugar().Infoln("key, shortURL, userID:", data.URL, shortURL, data.UserID)
+		shortURLExist, err := m.InsertShortURL(ctx, data, shortURL, st.File, st.DB)
 		if err == nil {
 			lg.Lg.Sugar().Infoln("error is empty")
 		} else {
@@ -104,9 +107,9 @@ func FileClose(file *os.File, lg *logger.TLog) {
 	}
 }
 
-func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *model.StringMap, st URLStorage) ([]model.DataAnswerMass, error) {
+func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *model.StringMap, st URLStorage, userID string) ([]model.DataAnswerMass, error) {
 	export := []model.DataAnswerMass{}
-	shortKeys := make(map[string]string)
+	shortKeys := make(model.TData)
 
 	for _, lineData := range values {
 		for attempt := 0; attempt < maxRetries; attempt++ {
@@ -121,7 +124,9 @@ func GetShortURLMass(ctx context.Context, values []model.DataRequestMass, m *mod
 				continue
 			}
 
-			shortKeys[shortURL] = lineData.OriginalURL
+			shortKeys[shortURL] = model.DataRow{
+				URL:    lineData.OriginalURL,
+				UserID: userID}
 			export = append(export, model.DataAnswerMass{CorrelationID: lineData.CorrelationID, ShortURL: shortURL})
 			break
 		}
@@ -173,4 +178,38 @@ func (st URLStorage) Close(log *logger.TLog) {
 		defer FileClose(st.File, log)
 	}
 
+}
+
+func DelShortURLs(shortURLs []model.ShortURL, userID string, st URLStorage, data *model.StringMap) error {
+	const batchSize = 10
+	ch := make(chan []string, batchSize)
+
+	go func() {
+		defer close(ch)
+		var ids []string
+		for _, shortURL := range shortURLs {
+			ids = append(ids, string(shortURL)) // предполагается, что поле называется ShortID
+		}
+
+		for i := 0; i < len(ids); i += batchSize {
+			end := i + batchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			ch <- ids[i:end]
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for batch := range ch {
+		wg.Add(1)
+		go func(b []string) {
+			defer wg.Done()
+			if err := model.MarkAsDeleted(b, userID, st.DB, data); err != nil {
+				log.Printf("Failed to mark batch as deleted: %v", err)
+			}
+		}(batch)
+	}
+	wg.Wait()
+	return nil
 }

@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/lib/pq"
 )
 
-type TData map[string]string
+type TData map[string]DataRow
 
 var ErrKeyExists = errors.New("key already exists")
 var ErrOriginalURLExist = errors.New("original url exists")
@@ -33,7 +35,24 @@ type DataAnswerMass struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func (m *StringMap) InsertShortURL(ctx context.Context, key, shortURL string, file *os.File, db *sql.DB) (shortURLExist string, err error) {
+type DataRow struct {
+	URL       string `json:"url"`
+	UserID    string `json:"userid"`
+	IsDeleted bool   `json:"-"`
+}
+
+type AllURLAnswer struct {
+	ShortURL string `json:"short_url"`
+	OrigURL  string `json:"original_url"`
+}
+
+type ContextKey string
+
+type ShortURL string
+
+const SecretKey = "secret_key"
+
+func (m *StringMap) InsertShortURL(ctx context.Context, data DataRow, shortURL string, file *os.File, db *sql.DB) (shortURLExist string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -42,10 +61,10 @@ func (m *StringMap) InsertShortURL(ctx context.Context, key, shortURL string, fi
 	}
 
 	if db != nil {
-		err := saveToDB(ctx, shortURL, key, db)
+		err := saveToDB(ctx, shortURL, data, db)
 		if errors.Is(err, ErrOriginalURLExist) {
 
-			shortURLExist, err = getExistShortURL(ctx, key, db)
+			shortURLExist, err = getExistShortURL(ctx, data.URL, db)
 			if err != nil {
 				return "", fmt.Errorf("failed getExistShortURL: %w", err)
 			}
@@ -62,20 +81,20 @@ func (m *StringMap) InsertShortURL(ctx context.Context, key, shortURL string, fi
 		}
 	}
 
-	(m.Data)[shortURL] = key
+	(m.Data)[shortURL] = data
 
 	return "", nil
 }
 
-func (m *StringMap) InsertShortURLMass(ctx context.Context, values map[string]string, db *sql.DB, file *os.File) error {
+func (m *StringMap) InsertShortURLMass(ctx context.Context, values TData, db *sql.DB, file *os.File) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for short, full := range values {
+	for short, data := range values {
 		if _, exists := (m.Data)[short]; exists {
 			return ErrKeyExists
 		}
-		(m.Data)[short] = full
+		(m.Data)[short] = data
 	}
 
 	if db != nil {
@@ -94,12 +113,24 @@ func (m *StringMap) InsertShortURLMass(ctx context.Context, values map[string]st
 	return nil
 }
 
-func (m *StringMap) GetFullURL(key string) (val string, err error) {
+func (m *StringMap) GetFullURL(key string) (DataRow, error) {
 	value, ok := (m.Data)[key]
 	if !ok {
-		return "", fmt.Errorf("id отсутствует")
+		return DataRow{}, fmt.Errorf("id отсутствует")
 	}
 	return value, nil
+}
+
+func (m *StringMap) GetAllURLsForUser(userID string) map[string]string {
+	allURLs := make(map[string]string)
+
+	for short, data := range m.Data {
+		if data.UserID == userID {
+			allURLs[short] = data.URL
+		}
+	}
+
+	return allURLs
 }
 
 func saveFile(data TData, f *os.File) error {
@@ -119,10 +150,10 @@ func saveFile(data TData, f *os.File) error {
 	return nil
 }
 
-func saveToDB(ctx context.Context, shortURL, key string, db *sql.DB) error {
-	query := `INSERT INTO tdata (shorturl, originalurl) VALUES ($1, $2) ON CONFLICT (originalurl) DO NOTHING RETURNING id`
+func saveToDB(ctx context.Context, shortURL string, data DataRow, db *sql.DB) error {
+	query := `INSERT INTO tdata (shorturl, originalurl, userID) VALUES ($1, $2, $3) ON CONFLICT (originalurl) DO NOTHING RETURNING id`
 	var newID int
-	err := db.QueryRowContext(ctx, query, shortURL, key).Scan(&newID)
+	err := db.QueryRowContext(ctx, query, shortURL, data.URL, data.UserID).Scan(&newID)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -140,7 +171,7 @@ func saveToDB(ctx context.Context, shortURL, key string, db *sql.DB) error {
 }
 
 func ReadDB(db *sql.DB) (data TData, err error) {
-	query := `SELECT shorturl, originalurl FROM tdata`
+	query := `SELECT shorturl, originalurl, userID, is_deleted FROM tdata`
 	ctx := context.Background()
 
 	rows, err := db.QueryContext(ctx, query)
@@ -153,13 +184,22 @@ func ReadDB(db *sql.DB) (data TData, err error) {
 
 	// пробегаем по всем записям
 	for rows.Next() {
-		var shortURL string
-		var fullURL string
-		err = rows.Scan(&shortURL, &fullURL)
+		var (
+			shortURL  string
+			fullURL   string
+			userID    string
+			isDeleted bool
+		)
+
+		err = rows.Scan(&shortURL, &fullURL, &userID, &isDeleted)
 		if err != nil {
 			return nil, err
 		}
-		data[shortURL] = fullURL
+
+		data[shortURL] = DataRow{
+			URL:       fullURL,
+			UserID:    userID,
+			IsDeleted: isDeleted}
 	}
 
 	// проверяем на ошибки
@@ -191,4 +231,26 @@ func CheckExistShortURL(ctx context.Context, shortURL string, db *sql.DB) (int, 
 		return 0, fmt.Errorf("failed queryrow, err: %w", err)
 	}
 	return count, nil
+}
+
+func MarkAsDeleted(shortURLs []string, userID string, db *sql.DB, data *StringMap) error {
+	query := `UPDATE tdata SET is_deleted = TRUE WHERE shorturl = ANY($1) AND userid = $2`
+	_, err := db.ExecContext(context.Background(), query, pq.Array(shortURLs), userID)
+	if err != nil {
+		return err
+	}
+
+	for _, shortURL := range shortURLs {
+		dataRow, ok := data.Data[shortURL]
+		if !ok {
+			continue
+		}
+
+		if dataRow.UserID == userID {
+			dataRow.IsDeleted = true
+			data.Data[shortURL] = dataRow
+		}
+	}
+
+	return nil
 }
