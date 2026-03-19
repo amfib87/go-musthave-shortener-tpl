@@ -1,6 +1,6 @@
 module github.com/amfib87/go-musthave-shortener-tpl
 
-go 1.25.8
+go 1.25.0
 
 require (
 	github.com/go-chi/chi v1.5.5
