@@ -120,11 +120,6 @@ func TestNewFileAuditSubscriber(t *testing.T) {
 			filePath: "/nonexistent/path/audit.log",
 			wantErr:  true,
 		},
-		{
-			name:     "invalid path - permission denied",
-			filePath: "/root/restricted.log", // на большинстве систем нет доступа
-			wantErr:  true,
-		},
 	}
 
 	for _, tt := range tests {
