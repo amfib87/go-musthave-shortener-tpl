@@ -11,6 +11,8 @@ type Cnfg struct {
 	AddrForURL  string
 	StoragePath string
 	DataBaseDsn string
+	AuditFile   string
+	AuditURL    string
 }
 
 func NewConfig() *Cnfg {
@@ -29,6 +31,9 @@ func ParseFlags(cfg *Cnfg) {
 	flag.StringVar(&cfg.AddrForURL, "b", "", "address to short URL")
 	flag.StringVar(&cfg.StoragePath, "f", "", "path file for storage")
 	flag.StringVar(&cfg.DataBaseDsn, "d", "", "address BD")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "address for audit file")
+	flag.StringVar(&cfg.AuditFile, "audit-url", "", "URL for audit")
+
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
 
@@ -54,5 +59,13 @@ func ParseFlags(cfg *Cnfg) {
 
 	if envDataBaseDsn, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		cfg.DataBaseDsn = envDataBaseDsn
+	}
+
+	if envAuditFile, ok := os.LookupEnv("AUDIT_FILE"); ok {
+		cfg.AuditFile = envAuditFile
+	}
+
+	if envAuditURL, ok := os.LookupEnv("AUDIT_URL"); ok {
+		cfg.AuditURL = envAuditURL
 	}
 }

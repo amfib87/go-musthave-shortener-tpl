@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	gz "github.com/amfib87/go-musthave-shortener-tpl/internal/gzip"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -26,9 +27,10 @@ type Handler struct {
 	mapURL *model.StringMap
 	Logger *logger.TLog
 	urlSt  service.URLStorage
+	audit  *audit.AuditManager
 }
 
-func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (h *Handler, err error) {
+func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage, au *audit.AuditManager) (h *Handler, err error) {
 	data, err := service.InitMap(st)
 	if err != nil {
 		return nil, err
@@ -115,6 +117,10 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	}
 
 	res.Write([]byte(serv))
+
+	// Аудит события
+	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
+	hndl.audit.NotifyAll(*hndl.Logger, event)
 }
 
 func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
@@ -164,6 +170,10 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 
 	res.Header().Set("Location", dataRow.URL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+
+	// Аудит события
+	event := audit.NewAuditEvent("follow", dataRow.UserID, dataRow.URL)
+	hndl.audit.NotifyAll(*hndl.Logger, event)
 }
 
 func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
@@ -263,6 +273,10 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 	res.Write(resp)
+
+	// Аудит события
+	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
+	hndl.audit.NotifyAll(*hndl.Logger, event)
 
 }
 

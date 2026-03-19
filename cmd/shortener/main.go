@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/router"
@@ -37,8 +38,15 @@ func run() error {
 	}
 	defer urlStorage.Close(logger)
 
+	// Инициализируем аудит
+	audit, err := audit.NewAuditManager(cfg.AuditFile, cfg.AddrForURL)
+	if err != nil {
+		logger.Lg.Error("failed audit.InitAudit %s", zap.Error(err))
+		return err
+	}
+
 	// Инициализируем маршрутизатор с конфигурацией
-	router, err := router.Init(cfg, logger, urlStorage)
+	router, err := router.Init(cfg, logger, urlStorage, audit)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed to init router: %v", err)
 		return err

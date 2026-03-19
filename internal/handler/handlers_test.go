@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
@@ -44,7 +45,7 @@ func TestMainPostHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewHandler(tt.cfg, logger, service.URLStorage{})
+			h, err := NewHandler(tt.cfg, logger, service.URLStorage{}, &audit.AuditManager{})
 			if err != nil {
 				require.Equal(t, err, nil)
 			}
@@ -81,7 +82,7 @@ func TestIDGetHandler(t *testing.T) {
 	}
 
 	cfg := &config.Cnfg{ServRunAddr: "", AddrForURL: "", StoragePath: path}
-	h, err := NewHandler(cfg, logger, service.URLStorage{})
+	h, err := NewHandler(cfg, logger, service.URLStorage{}, &audit.AuditManager{})
 	if err != nil {
 		require.Equal(t, err, nil)
 	}
@@ -144,7 +145,7 @@ func TestPostShortenHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h, err := NewHandler(&config.Cnfg{
 			AddrForURL: "http://test-host", StoragePath: path,
-		}, logger, service.URLStorage{})
+		}, logger, service.URLStorage{}, &audit.AuditManager{})
 		require.Equal(t, err, nil)
 		h.PostURLJSONHandler(w, r)
 	}))
