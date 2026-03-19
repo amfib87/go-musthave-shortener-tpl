@@ -25,7 +25,7 @@ func TestNewAuditEvent(t *testing.T) {
 			url:    "https://mylongdomain.com/my/long/path/to/shorten/",
 			want: func() *AuditEvent {
 				return &AuditEvent{
-					Ts:     time.Now().Unix(),
+					TS:     time.Now().Unix(),
 					Action: "shorten",
 					UserID: "12315134",
 					URL:    "https://mylongdomain.com/my/long/path/to/shorten/",
@@ -39,7 +39,7 @@ func TestNewAuditEvent(t *testing.T) {
 			url:    "https://example.com/abc123",
 			want: func() *AuditEvent {
 				return &AuditEvent{
-					Ts:     time.Now().Unix(),
+					TS:     time.Now().Unix(),
 					Action: "follow",
 					UserID: "",
 					URL:    "https://example.com/abc123",
@@ -53,7 +53,7 @@ func TestNewAuditEvent(t *testing.T) {
 			url:    "",
 			want: func() *AuditEvent {
 				return &AuditEvent{
-					Ts:     time.Now().Unix(),
+					TS:     time.Now().Unix(),
 					Action: "",
 					UserID: "",
 					URL:    "",
@@ -80,8 +80,8 @@ func TestNewAuditEvent(t *testing.T) {
 
 			// Проверяем, что Ts — это текущее время (в пределах ±1 секунды)
 			now := time.Now().Unix()
-			if got.Ts < now-1 || got.Ts > now+1 {
-				t.Errorf("Ts = %v, expected to be close to current time %v", got.Ts, now)
+			if got.TS < now-1 || got.TS > now+1 {
+				t.Errorf("Ts = %v, expected to be close to current time %v", got.TS, now)
 			}
 		})
 	}
@@ -193,7 +193,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			name:     "successful write to file",
 			filePath: "test_audit_notify_1.log",
 			event: &AuditEvent{
-				Ts:     12345678,
+				TS:     12345678,
 				Action: "shorten",
 				UserID: "12315134",
 				URL:    "https://mylongdomain.com/my/long/path/to/shorten/",
@@ -207,7 +207,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			name:     "nil subscriber",
 			filePath: "", // вернёт nil subscriber
 			event: &AuditEvent{
-				Ts:     12345678,
+				TS:     12345678,
 				Action: "follow",
 				UserID: "",
 				URL:    "https://example.com/abc123",
@@ -218,7 +218,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			name:     "empty event fields",
 			filePath: "test_audit_notify_2.log",
 			event: &AuditEvent{
-				Ts:     99999999,
+				TS:     99999999,
 				Action: "",
 				UserID: "",
 				URL:    "",
@@ -232,7 +232,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			name:     "large event data",
 			filePath: "test_audit_notify_3.log",
 			event: &AuditEvent{
-				Ts:     1234567890,
+				TS:     1234567890,
 				Action: "shorten",
 				UserID: "987654321",
 				URL:    "https://very.long.domain.name/with/a/very/long/path/that/exceeds/typical/length/limits",
@@ -430,7 +430,7 @@ func TestRemoteAuditSubscriber_Notify(t *testing.T) {
 			name: "successful notification - valid event",
 			url:  server.URL,
 			event: &AuditEvent{
-				Ts:     12345678,
+				TS:     12345678,
 				Action: "shorten",
 				UserID: "12315134",
 				URL:    "https://mylongdomain.com/my/long/path/to/shorten/",
@@ -441,7 +441,7 @@ func TestRemoteAuditSubscriber_Notify(t *testing.T) {
 			name: "nil subscriber",
 			url:  "", // вернёт nil subscriber
 			event: &AuditEvent{
-				Ts:     12345678,
+				TS:     12345678,
 				Action: "follow",
 				UserID: "",
 				URL:    "https://example.com/abc123",
@@ -459,7 +459,7 @@ func TestRemoteAuditSubscriber_Notify(t *testing.T) {
 				return errorServer.URL
 			}(),
 			event: &AuditEvent{
-				Ts:     99999999,
+				TS:     99999999,
 				Action: "test",
 				UserID: "testuser",
 				URL:    "https://test.com",

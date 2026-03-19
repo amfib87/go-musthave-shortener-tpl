@@ -19,7 +19,7 @@ type Audit struct {
 }
 
 type AuditEvent struct {
-	Ts     int64  `json:"ts"`
+	TS     int64  `json:"ts"`
 	Action string `json:"action"`
 	UserID string `json:"user_id"`
 	URL    string `json:"url"`
@@ -32,7 +32,7 @@ type AuditSubscriber interface {
 
 func NewAuditEvent(action, userID, url string) *AuditEvent {
 	return &AuditEvent{
-		Ts:     time.Now().Unix(),
+		TS:     time.Now().Unix(),
 		Action: action,
 		UserID: userID,
 		URL:    url,
