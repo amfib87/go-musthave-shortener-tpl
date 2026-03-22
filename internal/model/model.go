@@ -114,6 +114,10 @@ func (m *StringMap) InsertShortURLMass(ctx context.Context, values TData, db *sq
 }
 
 func (m *StringMap) GetFullURL(key string) (DataRow, error) {
+	if key == "" {
+		return DataRow{}, fmt.Errorf("id пустой")
+	}
+
 	value, ok := (m.Data)[key]
 	if !ok {
 		return DataRow{}, fmt.Errorf("id отсутствует")

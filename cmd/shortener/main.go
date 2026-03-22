@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	_ "net/http/pprof"
+
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
