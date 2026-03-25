@@ -58,11 +58,8 @@ func GetShortURL(ctx context.Context, data model.DataRow, m *model.StringMap, st
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		shortURL := generateShortID()
 
-		lg.Lg.Sugar().Infoln("key, shortURL, userID:", data.URL, shortURL, data.UserID)
 		shortURLExist, err := m.InsertShortURL(ctx, data, shortURL, st.File, st.DB)
-		if err == nil {
-			lg.Lg.Sugar().Infoln("error is empty")
-		} else {
+		if err != nil {
 			lg.Lg.Sugar().Infoln("error with InsertShortURL:", err.Error())
 		}
 

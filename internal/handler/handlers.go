@@ -44,8 +44,26 @@ func NewHandler(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage, au *au
 	}, nil
 }
 
+// PostURLHandler обрабатывает HTTP‑запрос на создание сокращённой версии URL.
+//
+// Метод ожидает, что тело входящего POST‑запроса содержит исходный URL в виде простого текста (Content‑Type не проверяется).
+//
+// Поведение и коды ответов:
+//   - HTTP 201 Created: URL успешно сокращён. В теле ответа — полный адрес сокращённого URL.
+//   - HTTP 400 Bad Request: тело запроса пустое либо произошла ошибка чтения тела запроса.
+//   - HTTP 409 Conflict: переданный исходный URL уже зарегистрирован в системе. В теле ответа возвращается существующий сокращённый URL.
+//   - HTTP 500 Internal Server Error: произошла внутренняя ошибка (например, не удалось сформировать URL или обработать запрос сервиса сокращения).
+//
+// Аудит:
+//   - После успешного создания сокращённого URL генерируется событие аудита типа "shorten" с указанием:
+//   - идентификатора пользователя;
+//   - исходного URL.
+//
+// Параметры:
+//
+//	res — объект http.ResponseWriter для формирования HTTP‑ответа.
+//	req — объект *http.Request с входящим HTTP‑запросом.
 func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started PostURLHandle")
 
 	dataRow := model.DataRow{}
 
@@ -62,7 +80,6 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	}
 
 	valUserID := req.Context().Value(userIDKey)
-	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
 	if valUserID != nil {
 		userID := valUserID.(string)
 		dataRow.UserID = userID
@@ -123,9 +140,43 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	hndl.audit.NotifyAll(*hndl.Logger, event)
 }
 
+// IDGetHandler обрабатывает HTTP‑запрос
+//
+// Метод извлекает ID из пути URL, находит соответствующий полный URL и выполняет перенаправление.
+//
+// Поведение и коды ответов:
+//   - HTTP 400 Bad Request: если ID отсутствует в пути URL (пустой путь или путь состоит только из слеша).
+//   - HTTP 404 Not Found: если указанный ID не найден в хранилище.
+//   - HTTP 410 Gone: если сокращённый URL помечен как удалённый (`dataRow.IsDeleted = true`)
+//     и запрос сделан владельцем URL (`dataRow.UserID` совпадает с `userID` из контекста).
+//   - HTTP 307 Temporary Redirect: успешное перенаправление на полный URL.
+//     В заголовке `Location` возвращается исходный URL.
+//
+// Извлечение идентификатора:
+//   - ID извлекается из `req.URL.Path` путём удаления первого символа (предполагается, что путь имеет вид `/{ID}`).
+//   - Если после удаления первого символа ID пуст, возвращается ошибка 400.
+//
+// Аудит:
+//   - После успешного перенаправления генерируется событие аудита типа "follow" с указанием:
+//   - идентификатора пользователя;
+//   - полного URL.
+//
+// Параметры:
+//
+//	res — объект http.ResponseWriter для формирования HTTP‑ответа.
+//	req — объект *http.Request с входящим HTTP‑запросом.
+//
+// Пример запроса:
+//
+//	GET /abc123 HTTP/1.1
+//	Host: short.example.com
+//
+// Пример успешного ответа:
+//
+//	HTTP/1.1 307 Temporary Redirect
+//	Location: https://example.com/very/long/url
+//	Content-Type: text/plain
 func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started IDGetHandler")
-
 	if req.URL.Path == "" {
 		http.Error(res, "id is empty", http.StatusBadRequest)
 		return
@@ -139,7 +190,6 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 
 	var userID string
 	valUserID := req.Context().Value(userIDKey)
-	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
 	if valUserID != nil {
 		userID = valUserID.(string)
 	} else {
@@ -158,10 +208,6 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	hndl.Logger.Lg.Info("dataRow.IsDeleted", zap.Any("dataRow.IsDeleted", dataRow.IsDeleted))
-	hndl.Logger.Lg.Info("dataRow.UserID", zap.Any("dataRow.UserID", dataRow.UserID))
-	hndl.Logger.Lg.Info("userID", zap.Any("userID", userID))
-
 	if dataRow.IsDeleted && dataRow.UserID == userID {
 		hndl.Logger.Lg.Sugar().Infoln("short URL is deleted")
 		res.WriteHeader(http.StatusGone)
@@ -176,9 +222,43 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 	hndl.audit.NotifyAll(*hndl.Logger, event)
 }
 
-func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started PostURLJSONHandler")
+// PostURLJSONHandler обрабатывает HTTP‑запрос на создание сокращённой версии URL в формате JSON.
+//
+// Метод ожидает JSON‑объект в теле POST‑запроса со структурой:
+//   {"url": "https://example.com/very/long/url"}
+//
+// Поведение и коды ответов:
+//   - HTTP 201 Created: URL успешно сокращён. В теле ответа — JSON с сокращённым URL:
+//     {"result": "http://short.example.com/abc123"}.
+//   - HTTP 400 Bad Request:
+//     - тело запроса пустое или не может быть прочитано;
+//     - JSON в теле запроса некорректен (ошибка парсинга);
+//     - поле `url` в JSON пустое.
+//   - HTTP 409 Conflict: переданный исходный URL уже зарегистрирован в системе. В теле ответа возвращается JSON с существующим сокращённым URL.
+//   - HTTP 500 Internal Server Error: произошла внутренняя ошибка (например, не удалось сформировать URL или обработать запрос сервиса сокращения).
+//
+// Аудит:
+//   - После успешного создания сокращённого URL генерируется событие аудита типа "shorten" с указанием:
+//     - идентификатора пользователя ;
+//     - исходного URL.
+//
+// Формат запроса:
+//   POST /api/shorten HTTP/1.1
+//   Content-Type: application/json
+//
+//   {"url": "https://example.com/very/long/url"}
+//
+// Формат успешного ответа (HTTP 201):
+//   HTTP/1.1 201 Created
+//   Content-Type: application/json
+//
+//   {"result": "http://short.example.com/abc123"}
+//
+// Параметры:
+//   res — объект http.ResponseWriter для формирования HTTP‑ответа.
+//   req — объект *http.Request с входящим HTTP‑запросом.
 
+func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Request) {
 	type dataRequest struct {
 		URL string `json:"url"`
 	}
@@ -209,7 +289,6 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 
 	var userID string
 	valUserID := req.Context().Value(userIDKey)
-	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
 	if valUserID != nil {
 		userID = valUserID.(string)
 	} else {
@@ -331,9 +410,53 @@ func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte(""))
 }
 
+// PostMassURLHandler обрабатывает HTTP‑запрос на массовое создание сокращённых URL в формате JSON.
+//
+// Метод ожидает массив JSON‑объектов в теле POST‑запроса со структурой:
+//
+//	[
+//	  {"url": "https://example.com/page1"},
+//	  {"url": "https://example.com/page2"}
+//	]
+//
+// Поведение и коды ответов:
+//   - HTTP 201 Created: все URL успешно сокращены (или обработаны). В теле ответа — массив JSON‑объектов с сокращёнными URL:
+//     [
+//     {"correlation_id": "1", "short_url": "http://short.example.com/abc123"},
+//     {"correlation_id": "2", "short_url": "http://short.example.com/def456"}
+//     ]
+//   - HTTP 400 Bad Request:
+//   - тело запроса пустое или не может быть прочитано;
+//   - JSON в теле запроса некорректен (ошибка парсинга);
+//   - хотя бы один объект в массиве не содержит поля `url`.
+//   - HTTP 500 Internal Server Error: произошла внутренняя ошибка:
+//   - не удалось обработать запрос сервиса массового сокращения (`GetShortURLMass`);
+//   - не удалось сформировать полный URL для какого‑либо сокращённого идентификатора;
+//   - ошибка маршалинга итогового JSON‑ответа.
+//
+// Формат запроса:
+//
+//	POST /api/shorten/mass HTTP/1.1
+//	Content-Type: application/json
+//	[
+//	  {"url": "https://example.com/very/long/url1", "correlation_id": "req-1"},
+//	  {"url": "https://example.com/very/long/url2", "correlation_id": "req-2"}
+//	]
+//
+// Формат успешного ответа (HTTP 201):
+//
+//	HTTP/1.1 201 Created
+//	Content-Type: application/json
+//	[
+//	  {"correlation_id": "req-1", "short_url": "http://short.example.com/abc123"},
+//	  {"correlation_id": "req-2", "short_url": "http://short.example.com/def456"}
+//	]
+//
+// Параметры:
+//
+//	res — объект http.ResponseWriter для формирования HTTP‑ответа.
+//	req — объект *http.Request с входящим HTTP‑запросом.
 func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started PostMassURLHandle")
-
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(req.Body)
 	if err != nil {
@@ -349,7 +472,6 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 
 	var userID string
 	valUserID := req.Context().Value(userIDKey)
-	hndl.Logger.Lg.Info("valUserID:", zap.Any("valUserID", valUserID))
 	if valUserID != nil {
 		userID = valUserID.(string)
 	} else {
@@ -392,8 +514,6 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 }
 
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started GetAllURLsHandle")
-
 	userID := req.Context().Value(userIDKey).(string)
 
 	allURLs := hndl.mapURL.GetAllURLsForUser(userID)
@@ -520,8 +640,6 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 }
 
 func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Request) {
-	hndl.Logger.Lg.Info("started DelShortURLsHandler")
-
 	userID := req.Context().Value(userIDKey).(string)
 
 	var buf bytes.Buffer

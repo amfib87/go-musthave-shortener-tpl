@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,9 +14,15 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+)
+
+const (
+	testUser string = "test-user"
 )
 
 func TestMainPostHandler(t *testing.T) {
@@ -208,4 +217,156 @@ func TestPostShortenHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ExampleHandler_PostURLHandler демонстрирует использование PostURLHandler для сокращения URL.
+//
+// Пример показывает:
+//   - успешный случай создания сокращённого URL;
+func ExampleHandler_PostURLHandler() {
+	// Создаём тестовый сервер и мок‑зависимости
+	handler := &Handler{
+		Logger: &logger.TLog{Lg: zap.NewExample()},
+		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		mapURL: &model.StringMap{Data: make(model.TData)},
+		urlSt:  service.URLStorage{},
+		audit:  nil,
+	}
+
+	// Мок‑реализация сервиса для тестирования
+	originalURL := "https://example.com/very/long/url"
+
+	// Тест 1: Успешное создание сокращённого URL
+	{
+		req := httptest.NewRequest(http.MethodPost, "/shorten", bytes.NewBufferString(originalURL))
+		// Добавляем UserID в контекст
+		ctx := context.WithValue(req.Context(), userIDKey, testUser)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.PostURLHandler(w, req)
+
+		resp := w.Result()
+
+		fmt.Printf("Status: %d\n", resp.StatusCode)
+		fmt.Printf("Headers: %v\n", resp.Header)
+		// Output:
+		// Status: 201
+		// Headers: map[Content-Type:[text/plain]]
+	}
+}
+
+// ExampleHandler_IDGetHandler демонстрирует использование IDGetHandler для перенаправления по сокращённому ID.
+//
+// Пример показывает:
+//   - успешное перенаправление по валидному ID;
+func ExampleHandler_IDGetHandler() {
+	// Создаём тестовый сервер и мок‑зависимости
+	handler := &Handler{
+		Logger: &logger.TLog{Lg: zap.NewExample()},
+		mapURL: &model.StringMap{Data: make(model.TData)},
+		audit:  nil,
+	}
+	handler.mapURL.Data["abc123"] = model.DataRow{
+		URL:    "https://example.com/very/long/url",
+		UserID: testUser,
+	}
+
+	// Тест 1: Успешное выполнение
+	{
+		req := httptest.NewRequest(http.MethodGet, "/abc123", nil)
+		// Добавляем UserID в контекст
+		ctx := context.WithValue(req.Context(), userIDKey, testUser)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.IDGetHandler(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		fmt.Printf("Status: %d\n", resp.StatusCode)
+		fmt.Printf("Location: %s\n", resp.Header.Get("Location"))
+		fmt.Printf("Headers: %v\n", resp.Header)
+		// Output:
+		// Status: 307
+		// Location: https://example.com/very/long/url
+		// Headers: map[Location:[https://example.com/very/long/url]]
+	}
+}
+
+// ExampleHandler_PostURLJSONHandler демонстрирует использование PostURLJSONHandler для сокращения URL через JSON API.
+//
+// Пример показывает:
+//   - успешный случай создания сокращённого URL;
+func ExampleHandler_PostURLJSONHandler() {
+	// Создаём тестовый сервер и мок‑зависимости
+	handler := &Handler{
+		Logger: &logger.TLog{Lg: zap.NewExample()}, // используем простой логгер для примера
+		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		mapURL: &model.StringMap{Data: make(model.TData)},
+		audit:  nil,
+	}
+
+	// Тест 1: Успешное создание сокращённого URL
+	{
+		requestBody := `{"url": "https://example.com/very/long/url"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(requestBody))
+		req.Header.Set("Content-Type", "application/json")
+		// Добавляем UserID в контекст
+		ctx := context.WithValue(req.Context(), userIDKey, testUser)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.PostURLJSONHandler(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		fmt.Printf("Status: %d\n", resp.StatusCode)
+		fmt.Printf("Headers: %v\n", resp.Header)
+		// Output:
+		// Status: 201
+		// Headers: map[Content-Type:[application/json]]
+	}
+
+}
+
+// ExampleHandler_PostMassURLHandler демонстрирует использование PostMassURLHandler для массового сокращения URL.
+//
+// Пример показывает:
+//   - успешный случай массового сокращения нескольких URL;
+func ExampleHandler_PostMassURLHandler() {
+	// Создаём тестовый сервер и мок‑зависимости
+	handler := &Handler{
+		Logger: &logger.TLog{Lg: zap.NewExample()}, // используем простой логгер для примера
+		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		mapURL: &model.StringMap{Data: make(model.TData)},
+	}
+
+	// Тест 1: Успешное массовое сокращение URL
+	{
+		requestBody := `[
+		{"url": "https://example.com/page1", "correlation_id": "req-1"},
+		{"url": "https://example.com/page2", "correlation_id": "req-2"}
+	]`
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/mass", bytes.NewBufferString(requestBody))
+		req.Header.Set("Content-Type", "application/json")
+		// Добавляем UserID в контекст
+		ctx := context.WithValue(req.Context(), userIDKey, "test-user-123")
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.PostMassURLHandler(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		fmt.Printf("Status: %d\n", resp.StatusCode)
+		fmt.Printf("Headers: %v\n", resp.Header)
+		// Output:
+		// Status: 201
+		// Headers: map[Content-Type:[application/json]]
+	}
+
 }
