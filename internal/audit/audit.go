@@ -10,13 +10,9 @@ import (
 	"time"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
+	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 )
-
-type Audit struct {
-	File     *os.File
-	CondFile *sync.Cond
-}
 
 type AuditEvent struct {
 	TS     int64  `json:"ts"`
@@ -41,11 +37,12 @@ func NewAuditEvent(action, userID, url string) *AuditEvent {
 
 type FileAuditSubscriber struct {
 	file *os.File
+	mu   sync.Mutex
 }
 
 func NewFileAuditSubscriber(filePath string) (*FileAuditSubscriber, error) {
 	if filePath == "" {
-		return nil, nil
+		return nil, fmt.Errorf("filepath is empty")
 	}
 
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
@@ -70,6 +67,8 @@ func (f *FileAuditSubscriber) Notify(event *AuditEvent) error {
 		return err
 	}
 
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	_, err = f.file.WriteString(string(data) + "\n")
 	return err
 }
@@ -88,11 +87,19 @@ type RemoteAuditSubscriber struct {
 
 func NewRemoteAuditSubscriber(url string) (*RemoteAuditSubscriber, error) {
 	if url == "" {
-		return nil, nil
+		return nil, fmt.Errorf("url is empty")
 	}
 
-	return &RemoteAuditSubscriber{client: &http.Client{Timeout: 5 * time.Second},
-		url: url}, nil
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 10
+
+	standardClient := retryClient.StandardClient() // *http.Client
+	standardClient.Timeout = 5 * time.Second
+
+	return &RemoteAuditSubscriber{
+			client: standardClient,
+			url:    url},
+		nil
 }
 
 func (r *RemoteAuditSubscriber) Notify(event *AuditEvent) error {
@@ -124,34 +131,43 @@ func (r *RemoteAuditSubscriber) Close() error {
 
 type AuditManager struct {
 	subscribers []AuditSubscriber
+	mu          sync.Mutex
 }
 
-func NewAuditManager(filePath, URL string) (*AuditManager, error) {
+func NewAuditManager(filePath, url string) (*AuditManager, error) {
 	manager := &AuditManager{}
 
 	// Добавляем файл-приемник, если указан
-	fileSub, err := NewFileAuditSubscriber(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed NewFileAuditSubscriber: %w", err)
-	}
-	if fileSub != nil {
-		manager.subscribers = append(manager.subscribers, fileSub)
+	if filePath != "" {
+		fileSub, err := NewFileAuditSubscriber(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed NewFileAuditSubscriber: %w", err)
+		}
+		if fileSub != nil {
+			manager.addSubscriber(fileSub)
+		}
 	}
 
 	// Добавляем удаленный приемник, если указан
-	remoteSub, err := NewRemoteAuditSubscriber(URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed NewRemoteAuditSubscriber: %w", err)
-	}
-	if remoteSub != nil {
-		manager.subscribers = append(manager.subscribers, remoteSub)
+	if url != "" {
+		remoteSub, err := NewRemoteAuditSubscriber(url)
+		if err != nil {
+			return nil, fmt.Errorf("failed NewRemoteAuditSubscriber: %w", err)
+		}
+		if remoteSub != nil {
+			manager.addSubscriber(remoteSub)
+		}
 	}
 
 	return manager, nil
 }
 
 func (a *AuditManager) NotifyAll(lg logger.TLog, event *AuditEvent) {
-	if a == nil {
+	if a == nil { // Проверка т.к. тест из-за паники не проходит
+		return
+	}
+
+	if a.subscribers == nil {
 		return
 	}
 
@@ -169,4 +185,25 @@ func (a *AuditManager) Close() error {
 		}
 	}
 	return nil
+}
+
+func (a *AuditManager) addSubscriber(subscr AuditSubscriber) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.subscribers = append(a.subscribers, subscr)
+}
+
+func (a *AuditManager) removeSubscriber(subscr AuditSubscriber) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for i, sub := range a.subscribers {
+		if sub == subscr {
+			a.subscribers = append(a.subscribers[:i], a.subscribers[i+1:]...)
+			return true
+		}
+	}
+
+	return false
 }

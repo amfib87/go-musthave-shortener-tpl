@@ -35,7 +35,7 @@ func run() error {
 
 	urlStorage, err := service.InitURLStorage(cfg, logger)
 	if err != nil {
-		logger.Lg.Error("failed IniturlStorage: %s", zap.Error(err))
+		logger.Lg.Error("failed IniturlStorage:", zap.Error(err))
 		return err
 	}
 	defer urlStorage.Close(logger)
@@ -43,7 +43,7 @@ func run() error {
 	// Инициализируем аудит
 	audit, err := audit.NewAuditManager(cfg.AuditFile, cfg.AddrForURL)
 	if err != nil {
-		logger.Lg.Error("failed audit.InitAudit %s", zap.Error(err))
+		logger.Lg.Error("failed audit.InitAudit", zap.Error(err))
 		return err
 	}
 

@@ -126,7 +126,7 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 	} else {
 		val, err := url.JoinPath(hndl.cfg.AddrForURL, "/", shortURL)
 		if err != nil {
-			hndl.Logger.Lg.Error("500 Internal Error: %v", zap.Error(err))
+			hndl.Logger.Lg.Error("500 Internal Error:", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -198,7 +198,7 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 
 	dataRow, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
-		hndl.Logger.Lg.Error("500 Internal Error: %v", zap.Error(err))
+		hndl.Logger.Lg.Error("500 Internal Error:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -302,7 +302,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 	dataAnsw.ShortURL, err = service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
 
 	if errors.Is(err, model.ErrOriginalURLExist) {
-		hndl.Logger.Lg.Sugar().Debugln("error GetShortURL: %v", err.Error())
+		hndl.Logger.Lg.Sugar().Debugln("error GetShortURL:", err.Error())
 
 		dataAnsw.ShortURL, err = url.JoinPath("http://", req.Host, "/", dataAnsw.ShortURL)
 		if err != nil {
@@ -496,7 +496,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 	for ind, lineAnswer := range dataAnsw {
 		lineAnswer.ShortURL, err = url.JoinPath(baseURL, "/", lineAnswer.ShortURL)
 		if err != nil {
-			hndl.Logger.Lg.Error("failed to compose the shortened URL: %v", zap.Error(err))
+			hndl.Logger.Lg.Error("failed to compose the shortened URL:", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -506,7 +506,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 
 	resp, err := json.Marshal(dataAnsw)
 	if err != nil {
-		hndl.Logger.Lg.Error("failed Marshal: %v", zap.Error(err))
+		hndl.Logger.Lg.Error("failed Marshal:", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

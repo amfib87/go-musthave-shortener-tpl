@@ -97,7 +97,7 @@ func TestNewFileAuditSubscriber(t *testing.T) {
 		{
 			name:     "empty file path (audit disabled)",
 			filePath: "",
-			wantErr:  false,
+			wantErr:  true,
 		},
 		{
 			name:     "valid file path - new file",
@@ -249,8 +249,8 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			f, err := NewFileAuditSubscriber(tt.filePath)
 
 			if tt.filePath == "" {
-				if err != nil {
-					t.Fatalf("NewFileAuditSubscriber() unexpected error for empty path: %v", err)
+				if err == nil {
+					t.Fatalf("NewFileAuditSubscriber() error should be for empty path: %v", err)
 				}
 				if f != nil {
 					t.Fatal("NewFileAuditSubscriber() should return nil for empty filePath")
@@ -326,7 +326,7 @@ func TestNewRemoteAuditSubscriber(t *testing.T) {
 		{
 			name:    "empty URL (subscriber disabled)",
 			url:     "",
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "URL with path",
@@ -469,8 +469,8 @@ func TestRemoteAuditSubscriber_Notify(t *testing.T) {
 
 			// Для случая с пустым URL ожидается nil subscriber и отсутствие ошибки
 			if tt.url == "" {
-				if err != nil {
-					t.Fatalf("NewRemoteAuditSubscriber() unexpected error for empty URL: %v", err)
+				if err == nil {
+					t.Fatalf("NewRemoteAuditSubscriber() error should be not nil for empty URL: %v", err)
 				}
 				if r != nil {
 					t.Fatal("NewRemoteAuditSubscriber() should return nil for empty URL")

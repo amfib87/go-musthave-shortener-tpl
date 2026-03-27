@@ -248,9 +248,9 @@ func TestStringMap_GetAllURLsForUser(t *testing.T) {
 
 func BenchmarkStringMap_GetAllURLsForUser(b *testing.B) {
 	// Подготавливаем тестовые данные разного размера
-	smallData := generateTestData(10)    // 10 записей
-	mediumData := generateTestData(1000) // 1 000 записей
-	largeData := generateTestData(10000) // 10 000 записей
+	smallData := generateTestData(b, 10)    // 10 записей
+	mediumData := generateTestData(b, 1000) // 1 000 записей
+	largeData := generateTestData(b, 10000) // 10 000 записей
 
 	tests := []struct {
 		name   string
@@ -280,10 +280,9 @@ func BenchmarkStringMap_GetAllURLsForUser(b *testing.B) {
 	}
 
 	for _, tt := range tests {
+		// 2. Использование b.Run для под-бенчмарков (рекомендуется)
 		b.Run(tt.name, func(b *testing.B) {
-			b.ResetTimer() // Сбрасываем таймер, чтобы не учитывать подготовку данных
-
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				tt.m.GetAllURLsForUser(tt.userID)
 			}
 		})
@@ -291,7 +290,9 @@ func BenchmarkStringMap_GetAllURLsForUser(b *testing.B) {
 }
 
 // Вспомогательная функция для генерации тестовых данных
-func generateTestData(size int) TData {
+func generateTestData(b *testing.B, size int) TData {
+	b.Helper() // Помечаем функцию как хелпер
+
 	data := make(TData, size)
 	users := []string{"user-0", "user-1", "user-2", "user-3", "user-4", "user-5"}
 
