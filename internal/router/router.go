@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/handler"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -15,13 +16,13 @@ type Router struct {
 	chi *chi.Mux
 }
 
-func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage) (*Router, error) {
+func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage, au *audit.AuditManager) (*Router, error) {
 	r := &Router{
 		chi: chi.NewRouter(),
 	}
 
 	// Создаём обработчик
-	h, err := handler.NewHandler(cfg, lg, st)
+	h, err := handler.NewHandler(cfg, lg, st, au)
 	if err != nil {
 		return nil, fmt.Errorf("failed NewHandler: %v", err)
 	}

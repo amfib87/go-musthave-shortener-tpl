@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
@@ -37,7 +38,7 @@ func TestInit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Init(tt.cfg, logger, service.URLStorage{})
+			got, err := Init(tt.cfg, logger, service.URLStorage{}, &audit.AuditManager{})
 			assert.NotNil(t, got, "Объект = nil")
 			assert.Equal(t, err, tt.err)
 		})

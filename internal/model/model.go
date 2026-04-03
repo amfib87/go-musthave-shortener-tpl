@@ -114,6 +114,10 @@ func (m *StringMap) InsertShortURLMass(ctx context.Context, values TData, db *sq
 }
 
 func (m *StringMap) GetFullURL(key string) (DataRow, error) {
+	if key == "" {
+		return DataRow{}, fmt.Errorf("id пустой")
+	}
+
 	value, ok := (m.Data)[key]
 	if !ok {
 		return DataRow{}, fmt.Errorf("id отсутствует")
@@ -225,10 +229,12 @@ func getExistShortURL(ctx context.Context, originalURL string, db *sql.DB) (shor
 
 func CheckExistShortURL(ctx context.Context, shortURL string, db *sql.DB) (int, error) {
 	var count int
-	row := db.QueryRowContext(ctx, "SELECT COUNT(*) as count FROM tdata WHERE shorturl = $1", shortURL)
-	err := row.Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("failed queryrow, err: %w", err)
+	if db != nil {
+		row := db.QueryRowContext(ctx, "SELECT COUNT(*) as count FROM tdata WHERE shorturl = $1", shortURL)
+		err := row.Scan(&count)
+		if err != nil {
+			return 0, fmt.Errorf("failed queryrow, err: %w", err)
+		}
 	}
 	return count, nil
 }
