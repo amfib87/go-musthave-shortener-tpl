@@ -1,3 +1,4 @@
+// Package handler предназначен для реализации функций-обработчиков
 package handler
 
 import (
@@ -100,7 +101,14 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusConflict)
-		res.Write([]byte(val))
+
+		_, err = res.Write([]byte(val))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
@@ -133,7 +141,12 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		serv = val
 	}
 
-	res.Write([]byte(serv))
+	_, err = res.Write([]byte(serv))
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	// Аудит события
 	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
@@ -320,7 +333,14 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusConflict)
-		res.Write([]byte(resp))
+
+		_, err = res.Write([]byte(resp))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
@@ -351,7 +371,13 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	// Аудит события
 	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
@@ -369,7 +395,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 			if strings.Contains(acceptEncoding, "gzip") {
 				newRes := gz.NewCompressWriter(res)
 				origRes = newRes
-				defer newRes.Close()
+				defer func() { _ = newRes.Close() }()
 			}
 		}
 
@@ -383,7 +409,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 			}
 			hndl.Logger.Lg.Info("newReader", zap.Any("newReader", newReader))
 			req.Body = newReader
-			defer newReader.Close()
+			defer func() { _ = newReader.Close() }()
 		}
 
 		h.ServeHTTP(origRes, req)
@@ -407,7 +433,13 @@ func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.WriteHeader(http.StatusOK)
-	res.Write([]byte(""))
+
+	_, err := res.Write([]byte(""))
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 // PostMassURLHandler обрабатывает HTTP‑запрос на массовое создание сокращённых URL в формате JSON.
@@ -510,7 +542,13 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
@@ -520,8 +558,14 @@ func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Reques
 	if len(allURLs) == 0 {
 		hndl.Logger.Lg.Error("didn't find URLs for userID")
 		res.WriteHeader(http.StatusNoContent)
-		res.Write([]byte(""))
+
+		_, err := res.Write([]byte(""))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 		return
+
 	} else {
 		hndl.Logger.Lg.Info("allURLs", zap.Any("allURLs", allURLs))
 	}
@@ -558,7 +602,13 @@ func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Reques
 
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 const cookieMaxAge = 86400 // 1 день

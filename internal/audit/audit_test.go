@@ -104,7 +104,7 @@ func TestNewFileAuditSubscriber(t *testing.T) {
 			filePath: "test_audit_1.log",
 			wantErr:  false,
 			cleanup: func() {
-				os.Remove("test_audit_1.log")
+				_ = os.Remove("test_audit_1.log")
 			},
 		},
 		{
@@ -112,7 +112,7 @@ func TestNewFileAuditSubscriber(t *testing.T) {
 			filePath: "test_audit_2.log",
 			wantErr:  false,
 			cleanup: func() {
-				os.Remove("test_audit_2.log")
+				_ = os.Remove("test_audit_2.log")
 			},
 		},
 		{
@@ -195,7 +195,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			},
 			wantErr: false,
 			cleanup: func() {
-				os.Remove("test_audit_notify_1.log")
+				_ = os.Remove("test_audit_notify_1.log")
 			},
 		},
 		{
@@ -220,7 +220,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			},
 			wantErr: false,
 			cleanup: func() {
-				os.Remove("test_audit_notify_2.log")
+				_ = os.Remove("test_audit_notify_2.log")
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 			},
 			wantErr: false,
 			cleanup: func() {
-				os.Remove("test_audit_notify_3.log")
+				_ = os.Remove("test_audit_notify_3.log")
 			},
 		},
 	}
@@ -266,7 +266,7 @@ func TestFileAuditSubscriber_Notify(t *testing.T) {
 				if err != nil {
 					t.Fatalf("could not construct receiver type: %v", err)
 				}
-				defer f.file.Close()
+				defer func() { _ = f.file.Close() }()
 			}
 
 			gotErr := f.Notify(tt.event)

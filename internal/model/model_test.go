@@ -119,28 +119,28 @@ func BenchmarkStringMap_GetFullURL(b *testing.B) {
 	// Тест 1: успешный поиск существующего ключа
 	b.Run("existing_key", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			m.GetFullURL("existing-key")
+			_, _ = m.GetFullURL("existing-key")
 		}
 	})
 
 	// Тест 2: поиск другого существующего ключа
 	b.Run("another_existing_key", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			m.GetFullURL("another-key")
+			_, _ = m.GetFullURL("another-key")
 		}
 	})
 
 	// Тест 3: поиск несуществующего ключа (ошибка)
 	b.Run("nonexistent_key", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			m.GetFullURL("nonexistent")
+			_, _ = m.GetFullURL("nonexistent")
 		}
 	})
 
 	// Тест 4: пустой ключ (ошибка)
 	b.Run("empty_key", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			m.GetFullURL("")
+			_, _ = m.GetFullURL("")
 		}
 	})
 }

@@ -1,3 +1,4 @@
+// Package logger предназначен для реализации логики логирования
 package logger
 
 import (

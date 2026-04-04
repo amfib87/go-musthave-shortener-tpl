@@ -1,3 +1,4 @@
+// Package service предназначен для реализации сервисных функций
 package service
 
 import (
@@ -169,7 +170,7 @@ func InitURLStorage(cfg *config.Cnfg, log *logger.TLog) (URLStorage, error) {
 
 func (st URLStorage) Close(log *logger.TLog) {
 	if st.DB != nil {
-		defer st.DB.Close()
+		defer func() { _ = st.DB.Close() }()
 	}
 	if st.File != nil {
 		defer FileClose(st.File, log)
