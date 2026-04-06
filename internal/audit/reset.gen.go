@@ -10,15 +10,18 @@ func (s *AuditEvent) Reset() {
 }
 
 func (s *FileAuditSubscriber) Reset() {
-	if s.file != nil { s.file = nil }
+	if s.file != nil {
+		s.file = nil
+	}
 }
 
 func (s *RemoteAuditSubscriber) Reset() {
-	if s.client != nil { s.client = nil }
+	if s.client != nil {
+		s.client = nil
+	}
 	s.url = ""
 }
 
 func (s *AuditManager) Reset() {
 	s.subscribers = s.subscribers[:0]
 }
-

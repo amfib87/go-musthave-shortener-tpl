@@ -267,17 +267,6 @@ func generateFieldResetCode(fieldName string, fieldType ast.Expr) string {
 }
 
 // Получает строковое представление типа для использования в коде
-// func getTypeString(expr ast.Expr) string {
-// 	switch t := expr.(type) {
-// 	case *ast.Ident:
-// 		return t.Name
-// 	case *ast.StarExpr:
-// 		return "*" + getTypeString(t.X)
-// 	default:
-// 		return "unknown"
-// 	}
-// }
-
 func getTypeString(expr ast.Expr) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
