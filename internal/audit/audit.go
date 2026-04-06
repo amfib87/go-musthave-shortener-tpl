@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// generate:reset
 type AuditEvent struct {
 	TS     int64  `json:"ts"`
 	Action string `json:"action"`
@@ -36,6 +37,7 @@ func NewAuditEvent(action, userID, url string) *AuditEvent {
 	}
 }
 
+// generate:reset
 type FileAuditSubscriber struct {
 	file *os.File
 	mu   sync.Mutex
@@ -81,6 +83,7 @@ func (f *FileAuditSubscriber) Close() error {
 	return nil
 }
 
+// generate:reset
 type RemoteAuditSubscriber struct {
 	client *http.Client
 	url    string
@@ -130,6 +133,7 @@ func (r *RemoteAuditSubscriber) Close() error {
 	return nil
 }
 
+// generate:reset
 type AuditManager struct {
 	subscribers []AuditSubscriber
 	mu          sync.Mutex
