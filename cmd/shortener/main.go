@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	_ "net/http/pprof"
 
@@ -77,8 +82,34 @@ func run() error {
 		return err
 	}
 
-	logger.Lg.Info("Running server", zap.String("address", cfg.ServRunAddr))
-	err = http.ListenAndServe(cfg.ServRunAddr, router)
-	logger.Lg.Sugar().Fatalf("failed listenServer: %v", err)
-	return err
+	server := &http.Server{
+		Addr:    cfg.ServRunAddr,
+		Handler: router,
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		logger.Lg.Info("Running server", zap.String("address", cfg.ServRunAddr))
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Lg.Fatal("Server failed: %v", zap.Error(err))
+		}
+	}()
+
+	<-stop
+	logger.Lg.Info("Shutdown signal received")
+
+	// Graceful shutdown с таймаутом
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Lg.Error("Graceful shutdown failed: %v", zap.Error(err))
+		// Принудительное закрытие
+		server.Close()
+	}
+	logger.Lg.Info("Server stopped gracefully")
+
+	return nil
 }

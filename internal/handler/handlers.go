@@ -80,17 +80,11 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID := valUserID.(string)
-		dataRow.UserID = userID
-	} else {
-		dataRow.UserID = "unknown"
-	}
+	dataRow.UserID = service.GetUserIDContx(req.Context(), userIDKey)
 
 	shortURL, err := service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
 	if err == model.ErrOriginalURLExist {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+		hndl.Logger.Lg.Sugar().Errorf("error GetShortURL: %v", err.Error())
 
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
@@ -195,19 +189,18 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if len(req.URL.Path) <= 1 {
+		http.Error(res, "id is required", http.StatusBadRequest)
+		return
+	}
+
 	ID := req.URL.Path[1:]
 	if ID == "" {
 		http.Error(res, "id is required", http.StatusBadRequest)
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataRow, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
@@ -300,13 +293,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataRow := model.DataRow{
 		URL:    dataReq.URL,
@@ -502,13 +489,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt, userID)
 	if err != nil {
@@ -552,7 +533,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 }
 
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
-	userID := req.Context().Value(userIDKey).(string)
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	allURLs := hndl.mapURL.GetAllURLsForUser(userID)
 	if len(allURLs) == 0 {
@@ -690,7 +671,7 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 }
 
 func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Request) {
-	userID := req.Context().Value(userIDKey).(string)
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(req.Body)
@@ -714,9 +695,7 @@ func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Requ
 	}
 
 	go func() {
-		if err := service.DelShortURLs(shortURL, userID, hndl.urlSt, hndl.mapURL); err != nil {
-			hndl.Logger.Lg.Error("failed DelShortURLs", zap.Error(err))
-		}
+		service.DelShortURLs(shortURL, userID, hndl.urlSt, hndl.mapURL, hndl.Logger)
 	}()
 
 	res.WriteHeader(http.StatusAccepted)

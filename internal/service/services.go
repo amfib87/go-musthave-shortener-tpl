@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"sync"
@@ -18,6 +17,7 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/repository"
+	"go.uber.org/zap"
 )
 
 const maxRetries = 5
@@ -60,18 +60,13 @@ func GetShortURL(ctx context.Context, data model.DataRow, m *model.StringMap, st
 		shortURL := generateShortID()
 
 		shortURLExist, err := m.InsertShortURL(ctx, data, shortURL, st.File, st.DB)
-		if err != nil {
-			lg.Lg.Sugar().Infoln("error with InsertShortURL:", err.Error())
-		}
-
-		if errors.Is(err, model.ErrOriginalURLExist) {
-			return shortURLExist, err
-		}
 		if err == nil {
 			return shortURL, nil
 		}
 
-		if errors.Is(err, model.ErrKeyExists) {
+		if errors.Is(err, model.ErrOriginalURLExist) {
+			return shortURLExist, err
+		} else if errors.Is(err, model.ErrKeyExists) {
 			continue
 		}
 
@@ -178,7 +173,7 @@ func (st URLStorage) Close(log *logger.TLog) {
 
 }
 
-func DelShortURLs(shortURLs []model.ShortURL, userID string, st URLStorage, data *model.StringMap) error {
+func DelShortURLs(shortURLs []model.ShortURL, userID string, st URLStorage, data *model.StringMap, log *logger.TLog) {
 	const batchSize = 10
 	ch := make(chan []string, batchSize)
 
@@ -204,10 +199,21 @@ func DelShortURLs(shortURLs []model.ShortURL, userID string, st URLStorage, data
 		go func(b []string) {
 			defer wg.Done()
 			if err := model.MarkAsDeleted(b, userID, st.DB, data); err != nil {
-				log.Printf("Failed to mark batch as deleted: %v", err)
+				log.Lg.Error("Failed to mark batch as deleted: %v", zap.Error(err))
 			}
 		}(batch)
 	}
 	wg.Wait()
-	return nil
+}
+
+func GetUserIDContx(cont context.Context, key model.ContextKey) (userID string) {
+
+	valUserID := cont.Value(key)
+	if valUserID != nil {
+		userID = valUserID.(string)
+	} else {
+		userID = "unknown"
+	}
+
+	return userID
 }
