@@ -1,3 +1,4 @@
+// Package gzip предназначен для реализации архивирования
 package gzip
 
 import (

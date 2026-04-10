@@ -1,3 +1,4 @@
+// Package config для получения аргументов командной строки и значения переменных окружения
 package config
 
 import (
@@ -24,7 +25,7 @@ func NewConfig() *Cnfg {
 	}
 }
 
-// parseFlags обрабатывает аргументы командной строки
+// ParseFlags обрабатывает аргументы командной строки
 // и сохраняет их значения в соответствующих переменных
 func ParseFlags(cfg *Cnfg) {
 	flag.StringVar(&cfg.ServRunAddr, "a", ":8080", "address and port to run server")

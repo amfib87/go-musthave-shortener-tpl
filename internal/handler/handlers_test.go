@@ -31,8 +31,8 @@ func TestMainPostHandler(t *testing.T) {
 		t.Fatal("failed create temp file", err)
 	}
 	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name()) // удаляем файл после теста
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name()) // удаляем файл после теста
 	}()
 	path := tempFile.Name()
 
@@ -76,8 +76,8 @@ func TestIDGetHandler(t *testing.T) {
 		t.Fatal("failed create temp file", err)
 	}
 	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name()) // удаляем файл после теста
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name()) // удаляем файл после теста
 	}()
 
 	path := tempFile.Name()
@@ -139,8 +139,8 @@ func TestPostShortenHandler(t *testing.T) {
 		t.Fatal("failed create temp file", err)
 	}
 	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name()) // удаляем файл после теста
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name()) // удаляем файл после теста
 	}()
 
 	path := tempFile.Name()
@@ -199,7 +199,7 @@ func TestPostShortenHandler(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tt.expectedStatus {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, resp.StatusCode)
@@ -283,7 +283,7 @@ func ExampleHandler_IDGetHandler() {
 		handler.IDGetHandler(w, req)
 
 		resp := w.Result()
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		fmt.Printf("Status: %d\n", resp.StatusCode)
 		fmt.Printf("Location: %s\n", resp.Header.Get("Location"))
@@ -321,7 +321,7 @@ func ExampleHandler_PostURLJSONHandler() {
 		handler.PostURLJSONHandler(w, req)
 
 		resp := w.Result()
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		fmt.Printf("Status: %d\n", resp.StatusCode)
 		fmt.Printf("Headers: %v\n", resp.Header)
@@ -360,7 +360,7 @@ func ExampleHandler_PostMassURLHandler() {
 		handler.PostMassURLHandler(w, req)
 
 		resp := w.Result()
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		fmt.Printf("Status: %d\n", resp.StatusCode)
 		fmt.Printf("Headers: %v\n", resp.Header)

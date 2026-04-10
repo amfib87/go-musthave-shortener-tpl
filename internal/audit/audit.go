@@ -1,3 +1,4 @@
+// Package audit предназначен для реализации логики аудита
 package audit
 
 import (
@@ -14,6 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// generate:reset
 type AuditEvent struct {
 	TS     int64  `json:"ts"`
 	Action string `json:"action"`
@@ -35,6 +37,7 @@ func NewAuditEvent(action, userID, url string) *AuditEvent {
 	}
 }
 
+// generate:reset
 type FileAuditSubscriber struct {
 	file *os.File
 	mu   sync.Mutex
@@ -80,6 +83,7 @@ func (f *FileAuditSubscriber) Close() error {
 	return nil
 }
 
+// generate:reset
 type RemoteAuditSubscriber struct {
 	client *http.Client
 	url    string
@@ -117,7 +121,7 @@ func (r *RemoteAuditSubscriber) Notify(event *AuditEvent) error {
 		return err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("remote audit failed: %s", resp.Status)
@@ -129,6 +133,7 @@ func (r *RemoteAuditSubscriber) Close() error {
 	return nil
 }
 
+// generate:reset
 type AuditManager struct {
 	subscribers []AuditSubscriber
 	mu          sync.Mutex

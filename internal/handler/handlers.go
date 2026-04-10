@@ -1,3 +1,4 @@
+// Package handler предназначен для реализации функций-обработчиков
 package handler
 
 import (
@@ -79,17 +80,11 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID := valUserID.(string)
-		dataRow.UserID = userID
-	} else {
-		dataRow.UserID = "unknown"
-	}
+	dataRow.UserID = service.GetUserIDContx(req.Context(), userIDKey)
 
 	shortURL, err := service.GetShortURL(req.Context(), dataRow, hndl.mapURL, hndl.urlSt, hndl.Logger)
 	if err == model.ErrOriginalURLExist {
-		hndl.Logger.Lg.Sugar().Infoln("error GetShortURL: %v", err.Error())
+		hndl.Logger.Lg.Sugar().Errorf("error GetShortURL: %v", err.Error())
 
 		val, err := url.JoinPath("http://", req.Host, "/", shortURL)
 		if err != nil {
@@ -100,7 +95,14 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusConflict)
-		res.Write([]byte(val))
+
+		_, err = res.Write([]byte(val))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
@@ -133,7 +135,12 @@ func (hndl *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) 
 		serv = val
 	}
 
-	res.Write([]byte(serv))
+	_, err = res.Write([]byte(serv))
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	// Аудит события
 	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
@@ -182,19 +189,18 @@ func (hndl *Handler) IDGetHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if len(req.URL.Path) <= 1 {
+		http.Error(res, "id is required", http.StatusBadRequest)
+		return
+	}
+
 	ID := req.URL.Path[1:]
 	if ID == "" {
 		http.Error(res, "id is required", http.StatusBadRequest)
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataRow, err := hndl.mapURL.GetFullURL(ID)
 	if err != nil {
@@ -287,13 +293,7 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataRow := model.DataRow{
 		URL:    dataReq.URL,
@@ -320,7 +320,14 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusConflict)
-		res.Write([]byte(resp))
+
+		_, err = res.Write([]byte(resp))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
@@ -351,7 +358,13 @@ func (hndl *Handler) PostURLJSONHandler(res http.ResponseWriter, req *http.Reque
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	// Аудит события
 	event := audit.NewAuditEvent("shorten", dataRow.UserID, dataRow.URL)
@@ -369,7 +382,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 			if strings.Contains(acceptEncoding, "gzip") {
 				newRes := gz.NewCompressWriter(res)
 				origRes = newRes
-				defer newRes.Close()
+				defer func() { _ = newRes.Close() }()
 			}
 		}
 
@@ -383,7 +396,7 @@ func (hndl *Handler) GzipMiddleware(h http.Handler) http.Handler {
 			}
 			hndl.Logger.Lg.Info("newReader", zap.Any("newReader", newReader))
 			req.Body = newReader
-			defer newReader.Close()
+			defer func() { _ = newReader.Close() }()
 		}
 
 		h.ServeHTTP(origRes, req)
@@ -407,7 +420,13 @@ func (hndl *Handler) GetPing(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.WriteHeader(http.StatusOK)
-	res.Write([]byte(""))
+
+	_, err := res.Write([]byte(""))
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 // PostMassURLHandler обрабатывает HTTP‑запрос на массовое создание сокращённых URL в формате JSON.
@@ -470,13 +489,7 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	var userID string
-	valUserID := req.Context().Value(userIDKey)
-	if valUserID != nil {
-		userID = valUserID.(string)
-	} else {
-		userID = "unknown"
-	}
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	dataAnsw, err := service.GetShortURLMass(req.Context(), dataReq, hndl.mapURL, hndl.urlSt, userID)
 	if err != nil {
@@ -510,18 +523,30 @@ func (hndl *Handler) PostMassURLHandler(res http.ResponseWriter, req *http.Reque
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Request) {
-	userID := req.Context().Value(userIDKey).(string)
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	allURLs := hndl.mapURL.GetAllURLsForUser(userID)
 	if len(allURLs) == 0 {
 		hndl.Logger.Lg.Error("didn't find URLs for userID")
 		res.WriteHeader(http.StatusNoContent)
-		res.Write([]byte(""))
+
+		_, err := res.Write([]byte(""))
+		if err != nil {
+			hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 		return
+
 	} else {
 		hndl.Logger.Lg.Info("allURLs", zap.Any("allURLs", allURLs))
 	}
@@ -558,7 +583,13 @@ func (hndl *Handler) GetAllURLsHandler(res http.ResponseWriter, req *http.Reques
 
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(resp)
+
+	_, err = res.Write(resp)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 const cookieMaxAge = 86400 // 1 день
@@ -640,7 +671,7 @@ func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 }
 
 func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Request) {
-	userID := req.Context().Value(userIDKey).(string)
+	userID := service.GetUserIDContx(req.Context(), userIDKey)
 
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(req.Body)
@@ -664,9 +695,7 @@ func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Requ
 	}
 
 	go func() {
-		if err := service.DelShortURLs(shortURL, userID, hndl.urlSt, hndl.mapURL); err != nil {
-			hndl.Logger.Lg.Error("failed DelShortURLs", zap.Error(err))
-		}
+		service.DelShortURLs(shortURL, userID, hndl.urlSt, hndl.mapURL, hndl.Logger)
 	}()
 
 	res.WriteHeader(http.StatusAccepted)

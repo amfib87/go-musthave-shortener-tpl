@@ -17,8 +17,8 @@ func TestInit(t *testing.T) {
 		t.Fatal("failed create temp file", err)
 	}
 	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name()) // удаляем файл после теста
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name()) // удаляем файл после теста
 	}()
 
 	path := tempFile.Name()

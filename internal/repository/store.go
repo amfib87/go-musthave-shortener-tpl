@@ -1,3 +1,4 @@
+// Package repository предназначен для работы с БД
 package repository
 
 import (

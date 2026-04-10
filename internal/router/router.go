@@ -1,3 +1,4 @@
+// Package router предназначен для работы с маршрутизатором функций-обработчиков
 package router
 
 import (

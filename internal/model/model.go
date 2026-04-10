@@ -1,3 +1,4 @@
+// Package model предназначен для реализации логики работы хранения и обработки данных
 package model
 
 import (
@@ -23,13 +24,13 @@ type StringMap struct {
 	Data TData `json:"data"`
 }
 
-// Структура входного элемента
+// DataRequestMass - Структура входного элемента
 type DataRequestMass struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
-// Структура выходного элемента
+// DataAnswerMass - Структура выходного элемента
 type DataAnswerMass struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
@@ -150,7 +151,9 @@ func saveFile(data TData, f *os.File) error {
 	if _, err := writer.Write(dataJSON); err != nil {
 		return err
 	}
-	writer.Flush()
+	if err := writer.Flush(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -182,7 +185,7 @@ func ReadDB(db *sql.DB) (data TData, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	data = make(TData)
 
