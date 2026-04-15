@@ -120,15 +120,13 @@ func run() error {
 		Handler: router,
 	}
 
-	if cfg.EnablHttps != "" {
-		server.TLSConfig = tlsConfig
-	}
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		if cfg.EnablHttps != "" {
+
+			server.TLSConfig = tlsConfig
 
 			logger.Lg.Info("Running HTTPS server", zap.String("address", cfg.ServRunAddr))
 			if err := server.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
@@ -148,7 +146,7 @@ func run() error {
 	logger.Lg.Info("Shutdown signal received")
 
 	// Graceful shutdown с таймаутом
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
