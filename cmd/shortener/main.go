@@ -64,7 +64,7 @@ func run() error {
 
 	// обрабатываем аргументы командной строки
 	cfg := config.NewConfig()
-	config.ParseFlags(cfg)
+	config.ParseFlags(cfg, logger)
 	logger.Lg.Info("cfg", zap.Any("cfg", cfg))
 
 	urlStorage, err := service.InitURLStorage(cfg, logger)
@@ -89,7 +89,7 @@ func run() error {
 	}
 
 	tlsConfig := &tls.Config{}
-	if cfg.EnablHttps != "" {
+	if cfg.EnablHttps != false {
 
 		// Проверяем существование файлов сертификата и ключа
 		if _, err := os.Stat(certFile); os.IsNotExist(err) {
@@ -124,7 +124,7 @@ func run() error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		if cfg.EnablHttps != "" {
+		if cfg.EnablHttps != false {
 
 			server.TLSConfig = tlsConfig
 
