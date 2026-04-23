@@ -151,8 +151,7 @@ func run() error {
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Lg.Error("Graceful shutdown failed: %v", zap.Error(err))
-		// Принудительное закрытие
-		server.Close()
+		server.Close() // Принудительное закрытие
 	}
 	logger.Lg.Info("Server stopped gracefully")
 
