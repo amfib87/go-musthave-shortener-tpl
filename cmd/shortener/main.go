@@ -145,8 +145,7 @@ func run() error {
 	<-stop
 	logger.Lg.Info("Shutdown signal received")
 
-	// Graceful shutdown с таймаутом
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second) // Graceful shutdown с таймаутом
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
