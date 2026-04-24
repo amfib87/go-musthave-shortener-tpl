@@ -44,6 +44,10 @@ func ParseFlags(cfg *Cnfg, log *logger.TLog) {
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL for audit")
 	flag.BoolVar(&cfg.EnablHttps, "s", false, "Enable HTTPS server")
 
+	var configFile string
+	flag.StringVar(&configFile, "c", "", "config file path")
+	flag.StringVar(&configFile, "config", "", "config file path")
+
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
 
@@ -86,10 +90,6 @@ func ParseFlags(cfg *Cnfg, log *logger.TLog) {
 		}
 		cfg.EnablHttps = EnablHttpsBool
 	}
-
-	var configFile string
-	flag.StringVar(&configFile, "c", "", "config file path")
-	flag.StringVar(&configFile, "config", "", "config file path")
 
 	if err := readConfigFile(configFile, cfg, log); err != nil {
 		log.Lg.Sugar().Errorln("Failed to load configuration: %v", err)
