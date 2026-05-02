@@ -38,6 +38,7 @@ func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage, au *audit.Au
 	r.chi.Get("/{id}", h.IDGetHandler)
 	r.chi.Get("/ping", h.GetPing)
 	r.chi.Get("/{api}/{user}/{urls}", h.GetAllURLsHandler)
+	r.chi.Get("/api/internal/stats", h.TrustedSubnetMiddleware(h.GetStats()))
 
 	r.chi.Post("/", h.PostURLHandler)
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)

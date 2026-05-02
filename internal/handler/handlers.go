@@ -597,7 +597,6 @@ const userIDKey model.ContextKey = "userID"
 
 func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		hndl.Logger.Lg.Info("started AuthCookieMiddleware")
 
 		type Claims struct {
 			UserID string `json:"user_id"`
@@ -700,4 +699,43 @@ func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Requ
 
 	res.WriteHeader(http.StatusAccepted)
 
+}
+
+func (hndl *Handler) GetStats() http.HandlerFunc {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		type statRespond struct {
+			URLs  int `json:"urls"`
+			Users int `json:"users"`
+		}
+
+		URLs, Users, err := model.GetDataStat(hndl.urlSt.DB)
+		if err != nil {
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		statResp := statRespond{
+			URLs:  URLs,
+			Users: Users}
+
+		res.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(res).Encode(statResp)
+	})
+}
+
+func (hndl *Handler) TrustedSubnetMiddleware(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		realIP := req.Header.Get("X-Real-IP")
+		if realIP == "" {
+			http.Error(res, "X-Real-IP header required", http.StatusBadRequest)
+			return
+		}
+
+		if !service.IsIPInSubnet(realIP, hndl.cfg.TrustedSubnet) {
+			http.Error(res, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		h.ServeHTTP(res, req)
+	})
 }

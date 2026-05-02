@@ -15,13 +15,14 @@ import (
 )
 
 type Cnfg struct {
-	ServRunAddr string `json:"server_address"`
-	AddrForURL  string `json:"base_url"`
-	StoragePath string `json:"file_storage_path"`
-	DataBaseDsn string `json:"database_dsn"`
-	AuditFile   string
-	AuditURL    string
-	EnablHttps  bool `json:"enable_https"`
+	ServRunAddr   string `json:"server_address"`
+	AddrForURL    string `json:"base_url"`
+	StoragePath   string `json:"file_storage_path"`
+	DataBaseDsn   string `json:"database_dsn"`
+	AuditFile     string
+	AuditURL      string
+	EnablHttps    bool   `json:"enable_https"`
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 func NewConfig() *Cnfg {
@@ -43,6 +44,7 @@ func ParseFlags(cfg *Cnfg, log *logger.TLog) {
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "address for audit file")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL for audit")
 	flag.BoolVar(&cfg.EnablHttps, "s", false, "Enable HTTPS server")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet")
 
 	var configFile string
 	flag.StringVar(&configFile, "c", "", "config file path")
@@ -91,6 +93,10 @@ func ParseFlags(cfg *Cnfg, log *logger.TLog) {
 		cfg.EnablHttps = EnablHttpsBool
 	}
 
+	if envTrustedSubnet, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
+		cfg.TrustedSubnet = envTrustedSubnet
+	}
+
 	if err := readConfigFile(configFile, cfg, log); err != nil {
 		log.Lg.Sugar().Errorln("Failed to load configuration: %v", err)
 	}
@@ -130,6 +136,10 @@ func readConfigFile(configFile string, cfg *Cnfg, log *logger.TLog) error {
 	}
 	if !cfg.EnablHttps { // Флаг для отслеживания, было ли значение задано извне
 		cfg.EnablHttps = fileConfig.EnablHttps
+	}
+
+	if cfg.TrustedSubnet == "" {
+		cfg.TrustedSubnet = fileConfig.TrustedSubnet
 	}
 
 	return nil
