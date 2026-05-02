@@ -277,3 +277,21 @@ func GenerateTLSCertificate(certFile, keyFile string) error {
 	log.Printf("Successfully created private key: %s", keyFile)
 	return nil
 }
+
+func IsIPInSubnet(ipStr, subnetStr string) bool {
+	if subnetStr == "" {
+		return false
+	}
+
+	_, subnet, err := net.ParseCIDR(subnetStr)
+	if err != nil {
+		return false
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	return subnet.Contains(ip)
+}
