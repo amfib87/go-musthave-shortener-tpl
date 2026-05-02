@@ -4,14 +4,23 @@ package service
 import (
 	"bufio"
 	"context"
+	crrand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"math/big"
 	"math/rand"
+	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
@@ -216,4 +225,55 @@ func GetUserIDContx(cont context.Context, key model.ContextKey) (userID string) 
 	}
 
 	return userID
+}
+
+func GenerateTLSCertificate(certFile, keyFile string) error {
+	privateKey, err := rsa.GenerateKey(crrand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate private key: %v", err)
+	}
+
+	// Заполняем информацию о сертификате
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"My Organization"},
+			CommonName:   "localhost",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour), // 1 год
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{"localhost"},
+		BasicConstraintsValid: true,
+	}
+
+	// Создаём самоподписанный сертификат
+	derBytes, err := x509.CreateCertificate(crrand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate: %v", err)
+	}
+
+	// Записываем сертификат в файл (PEM‑формат)
+	certOut, err := os.Create(certFile)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate file: %v", err)
+	}
+	defer certOut.Close()
+
+	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+
+	// Записываем приватный ключ в файл (PEM‑формат)
+	keyOut, err := os.Create(keyFile)
+	if err != nil {
+		return fmt.Errorf("failed to create key file: %v", err)
+	}
+	defer keyOut.Close()
+
+	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+
+	log.Printf("Successfully created TLS certificate: %s", certFile)
+	log.Printf("Successfully created private key: %s", keyFile)
+	return nil
 }

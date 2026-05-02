@@ -2,18 +2,26 @@
 package config
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
+
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 )
 
 type Cnfg struct {
-	ServRunAddr string
-	AddrForURL  string
-	StoragePath string
-	DataBaseDsn string
+	ServRunAddr string `json:"server_address"`
+	AddrForURL  string `json:"base_url"`
+	StoragePath string `json:"file_storage_path"`
+	DataBaseDsn string `json:"database_dsn"`
 	AuditFile   string
 	AuditURL    string
+	EnablHttps  bool `json:"enable_https"`
 }
 
 func NewConfig() *Cnfg {
@@ -27,13 +35,18 @@ func NewConfig() *Cnfg {
 
 // ParseFlags обрабатывает аргументы командной строки
 // и сохраняет их значения в соответствующих переменных
-func ParseFlags(cfg *Cnfg) {
+func ParseFlags(cfg *Cnfg, log *logger.TLog) {
 	flag.StringVar(&cfg.ServRunAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&cfg.AddrForURL, "b", "", "address to short URL")
 	flag.StringVar(&cfg.StoragePath, "f", "", "path file for storage")
 	flag.StringVar(&cfg.DataBaseDsn, "d", "", "address BD")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "address for audit file")
-	flag.StringVar(&cfg.AuditFile, "audit-url", "", "URL for audit")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL for audit")
+	flag.BoolVar(&cfg.EnablHttps, "s", false, "Enable HTTPS server")
+
+	var configFile string
+	flag.StringVar(&configFile, "c", "", "config file path")
+	flag.StringVar(&configFile, "config", "", "config file path")
 
 	// парсим переданные серверу аргументы в зарегистрированные переменные
 	flag.Parse()
@@ -69,4 +82,55 @@ func ParseFlags(cfg *Cnfg) {
 	if envAuditURL, ok := os.LookupEnv("AUDIT_URL"); ok {
 		cfg.AuditURL = envAuditURL
 	}
+
+	if envEnablHttps, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
+		EnablHttpsBool, err := strconv.ParseBool(envEnablHttps)
+		if err != nil {
+			log.Lg.Sugar().Errorln("failed get strconv.ParseBool", err)
+		}
+		cfg.EnablHttps = EnablHttpsBool
+	}
+
+	if err := readConfigFile(configFile, cfg, log); err != nil {
+		log.Lg.Sugar().Errorln("Failed to load configuration: %v", err)
+	}
+}
+
+func readConfigFile(configFile string, cfg *Cnfg, log *logger.TLog) error {
+	if configFile == "" {
+		return nil // Файл не указан — пропускаем
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			log.Lg.Sugar().Errorln("Config file %s not found, skipping", configFile)
+			return nil
+		}
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var fileConfig Cnfg
+	if err := json.Unmarshal(data, &fileConfig); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Применяем только те поля, которые ещё не заданы флагами/окружением
+	if cfg.ServRunAddr == "" {
+		cfg.ServRunAddr = fileConfig.ServRunAddr
+	}
+	if cfg.AddrForURL == "" {
+		cfg.AddrForURL = fileConfig.AddrForURL
+	}
+	if cfg.StoragePath == "" {
+		cfg.StoragePath = fileConfig.StoragePath
+	}
+	if cfg.DataBaseDsn == "" {
+		cfg.DataBaseDsn = fileConfig.DataBaseDsn
+	}
+	if !cfg.EnablHttps { // Флаг для отслеживания, было ли значение задано извне
+		cfg.EnablHttps = fileConfig.EnablHttps
+	}
+
+	return nil
 }

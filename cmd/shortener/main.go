@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -50,6 +51,11 @@ func main() {
 }
 
 func run() error {
+	const (
+		certFile string = "server.crt"
+		keyFile  string = "server.key"
+	)
+
 	logger, err := logger.Initialize("Info")
 	if err != nil {
 		log.Fatalf("failed init logger: %v", err)
@@ -58,7 +64,7 @@ func run() error {
 
 	// обрабатываем аргументы командной строки
 	cfg := config.NewConfig()
-	config.ParseFlags(cfg)
+	config.ParseFlags(cfg, logger)
 	logger.Lg.Info("cfg", zap.Any("cfg", cfg))
 
 	urlStorage, err := service.InitURLStorage(cfg, logger)
@@ -82,32 +88,69 @@ func run() error {
 		return err
 	}
 
+	tlsConfig := &tls.Config{}
+	if cfg.EnablHttps != false {
+
+		// Проверяем существование файлов сертификата и ключа
+		if _, err := os.Stat(certFile); os.IsNotExist(err) {
+			logger.Lg.Sugar().Infoln("Certificate not found, generating new self‑signed certificate...")
+			err := service.GenerateTLSCertificate(certFile, keyFile)
+			if err != nil {
+				logger.Lg.Sugar().Fatalf("Failed to generate certificate: ", err)
+			}
+		}
+
+		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+			logger.Lg.Sugar().Infoln("Private key not found, generating new private key...")
+			err := service.GenerateTLSCertificate(certFile, keyFile)
+			if err != nil {
+				logger.Lg.Sugar().Fatalf("Failed to generate key: ", err)
+			}
+		}
+
+		tlsConfig.MinVersion = tls.VersionTLS12
+		tlsConfig.CipherSuites = []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		}
+	}
+
 	server := &http.Server{
 		Addr:    cfg.ServRunAddr,
 		Handler: router,
 	}
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
 	go func() {
-		logger.Lg.Info("Running server", zap.String("address", cfg.ServRunAddr))
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Lg.Fatal("Server failed: %v", zap.Error(err))
+		if cfg.EnablHttps != false {
+
+			server.TLSConfig = tlsConfig
+
+			logger.Lg.Info("Running HTTPS server", zap.String("address", cfg.ServRunAddr))
+			if err := server.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				logger.Lg.Fatal("Server failed: %v", zap.Error(err))
+			}
+
+		} else {
+
+			logger.Lg.Info("Running server", zap.String("address", cfg.ServRunAddr))
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Lg.Fatal("Server failed: %v", zap.Error(err))
+			}
 		}
 	}()
 
 	<-stop
 	logger.Lg.Info("Shutdown signal received")
 
-	// Graceful shutdown с таймаутом
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second) // Graceful shutdown с таймаутом
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Lg.Error("Graceful shutdown failed: %v", zap.Error(err))
-		// Принудительное закрытие
-		server.Close()
+		server.Close() // Принудительное закрытие
 	}
 	logger.Lg.Info("Server stopped gracefully")
 

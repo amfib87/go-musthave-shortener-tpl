@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -100,7 +101,11 @@ func TestParseFlags(t *testing.T) {
 
 			// Вызываем тестируемую функцию
 			cfg := &Cnfg{}
-			ParseFlags(cfg)
+			logger, err := logger.Initialize("Info")
+			if err != nil {
+				t.Fatalf("failed to init logger: %v", err)
+			}
+			ParseFlags(cfg, logger)
 
 			// Проверяем результаты
 			if cfg.ServRunAddr != tt.expServRunAddr {
