@@ -227,9 +227,9 @@ func ExampleHandler_PostURLHandler() {
 	// Создаём тестовый сервер и мок‑зависимости
 	handler := &Handler{
 		Logger: &logger.TLog{Lg: zap.NewExample()},
-		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
-		mapURL: &model.StringMap{Data: make(model.TData)},
-		urlSt:  service.URLStorage{},
+		Cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		MapURL: &model.StringMap{Data: make(model.TData)},
+		URLSt:  service.URLStorage{},
 		audit:  nil,
 	}
 
@@ -264,10 +264,10 @@ func ExampleHandler_IDGetHandler() {
 	// Создаём тестовый сервер и мок‑зависимости
 	handler := &Handler{
 		Logger: &logger.TLog{Lg: zap.NewExample()},
-		mapURL: &model.StringMap{Data: make(model.TData)},
+		MapURL: &model.StringMap{Data: make(model.TData)},
 		audit:  nil,
 	}
-	handler.mapURL.Data["abc123"] = model.DataRow{
+	handler.MapURL.Data["abc123"] = model.DataRow{
 		URL:    "https://example.com/very/long/url",
 		UserID: testUser,
 	}
@@ -303,8 +303,8 @@ func ExampleHandler_PostURLJSONHandler() {
 	// Создаём тестовый сервер и мок‑зависимости
 	handler := &Handler{
 		Logger: &logger.TLog{Lg: zap.NewExample()}, // используем простой логгер для примера
-		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
-		mapURL: &model.StringMap{Data: make(model.TData)},
+		Cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		MapURL: &model.StringMap{Data: make(model.TData)},
 		audit:  nil,
 	}
 
@@ -340,8 +340,8 @@ func ExampleHandler_PostMassURLHandler() {
 	// Создаём тестовый сервер и мок‑зависимости
 	handler := &Handler{
 		Logger: &logger.TLog{Lg: zap.NewExample()}, // используем простой логгер для примера
-		cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
-		mapURL: &model.StringMap{Data: make(model.TData)},
+		Cfg:    &config.Cnfg{AddrForURL: "https://short.example.com"},
+		MapURL: &model.StringMap{Data: make(model.TData)},
 	}
 
 	// Тест 1: Успешное массовое сокращение URL

@@ -15,8 +15,9 @@ import (
 
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/audit"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/config"
+	"github.com/amfib87/go-musthave-shortener-tpl/internal/grpc"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
-	"github.com/amfib87/go-musthave-shortener-tpl/internal/router"
+	rt "github.com/amfib87/go-musthave-shortener-tpl/internal/router"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
@@ -82,7 +83,7 @@ func run() error {
 	}
 
 	// Инициализируем маршрутизатор с конфигурацией
-	router, err := router.Init(cfg, logger, urlStorage, audit)
+	router, err := rt.Init(cfg, logger, urlStorage, audit)
 	if err != nil {
 		logger.Lg.Sugar().Fatalf("failed to init router: %v", err)
 		return err
@@ -141,6 +142,14 @@ func run() error {
 			}
 		}
 	}()
+
+	// Инициализация gRPC‑сервера
+	err = grpc.StartGRPCServer(cfg.ServRunAddr)
+	if err != nil {
+		logger.Lg.Error("failed to start gRPC server", zap.Error(err))
+		return err
+	}
+	logger.Lg.Info("gRPC server started", zap.String("address", cfg.ServRunAddr))
 
 	<-stop
 	logger.Lg.Info("Shutdown signal received")
