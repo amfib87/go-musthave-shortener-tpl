@@ -177,6 +177,36 @@ func saveToDB(ctx context.Context, shortURL string, data DataRow, db *sql.DB) er
 	}
 }
 
+type DataStat struct {
+	Urls  int
+	Users int
+}
+
+func GetDataStat(ctx context.Context, db *sql.DB) (dataStat DataStat, err error) {
+
+	query := `SELECT COUNT(*) FROM tdata`
+	var urls, users int
+
+	if err := db.QueryRowContext(ctx, query).Scan(&urls); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return DataStat{}, nil
+		}
+		return DataStat{}, err
+	}
+
+	query = `SELECT COUNT(DISTINCT userid) FROM tdata`
+	if err := db.QueryRowContext(ctx, query).Scan(&users); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return DataStat{}, nil
+		}
+		return DataStat{}, err
+	}
+
+	return DataStat{
+		Urls:  urls,
+		Users: users}, nil
+}
+
 func ReadDB(db *sql.DB) (data TData, err error) {
 	query := `SELECT shorturl, originalurl, userID, is_deleted FROM tdata`
 	ctx := context.Background()
