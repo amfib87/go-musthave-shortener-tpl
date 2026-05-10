@@ -598,31 +598,17 @@ const userIDKey model.ContextKey = "userID"
 func (hndl *Handler) AuthCookieMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 
-		type Claims struct {
-			UserID string `json:"user_id"`
-			jwt.RegisteredClaims
-		}
-
-		cl := Claims{}
+		cl := service.Claims{}
 		cookie, err := req.Cookie(service.CookieName)
 		if err == nil {
 			if cookie.Value != "" {
-				token, err := jwt.ParseWithClaims(cookie.Value, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-					return []byte(model.SecretKey), nil
-				})
-
-				if err == nil && token.Valid {
-					if claims, ok := token.Claims.(*Claims); ok {
-						cl = *claims
-						hndl.Logger.Lg.Info("Authenticated user:", zap.Any("usrID", claims.UserID))
-					}
-
-					if cl.UserID == "" { // Кука есть, но id пуст => возвращаем 401 Unauthorized
-						hndl.Logger.Lg.Error("cookie userID is empty")
-						http.Error(res, "Unauthorized", http.StatusUnauthorized)
-						return
-					}
+				cl.UserID, err = service.GetUserID(cookie.Value)
+				if err != nil {
+					hndl.Logger.Lg.Error("failed GetUserID")
+					http.Error(res, "Unauthorized", http.StatusUnauthorized)
+					return
 				}
+				hndl.Logger.Lg.Info("Authenticated user:", zap.Any("usrID", cl.UserID))
 			}
 		}
 
@@ -701,29 +687,36 @@ func (hndl *Handler) DelShortURLsHandler(res http.ResponseWriter, req *http.Requ
 
 }
 
-func (hndl *Handler) GetStats() http.HandlerFunc {
-	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		type statRespond struct {
-			URLs  int `json:"urls"`
-			Users int `json:"users"`
-		}
+func (hndl *Handler) GetStats(res http.ResponseWriter, req *http.Request) {
+	type statRespond struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}
 
-		URLs, Users, err := model.GetDataStat(hndl.URLSt.DB)
-		if err != nil {
-			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
+	dataStat, err := model.GetDataStat(req.Context(), hndl.URLSt.DB)
+	if err != nil {
+		hndl.Logger.Lg.Error("failed model.GetDataStat:", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
-		statResp := statRespond{
-			URLs:  URLs,
-			Users: Users}
+	statResp := statRespond{
+		URLs:  dataStat.Urls,
+		Users: dataStat.Users,
+	}
 
-		res.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(res).Encode(statResp)
-	})
+	res.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(res).Encode(statResp)
+
+	_, err = res.Write([]byte(""))
+	if err != nil {
+		hndl.Logger.Lg.Error("failed res.Write", zap.Error(err))
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
-func (hndl *Handler) TrustedSubnetMiddleware(h http.HandlerFunc) http.HandlerFunc {
+func (hndl *Handler) TrustedSubnetMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		realIP := req.Header.Get("X-Real-IP")
 		if realIP == "" {

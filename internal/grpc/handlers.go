@@ -8,11 +8,40 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/service"
 	pb "github.com/amfib87/go-musthave-shortener-tpl/proto"
-
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
+func (s *Server) ListUserURLs(ctx context.Context, req *pb.ListUserURLsRequest) (*pb.UserURLsResponse, error) {
+	userID, ok := ctx.Value("userID").(string)
+	if !ok {
+		return nil, errors.New("user ID not found in context")
+	}
+
+	allURLs := s.Handler.MapURL.GetAllURLsForUser(userID)
+
+	baseURL := s.Handler.Cfg.AddrForURL
+	if baseURL == "" {
+		baseURL = "http://" + s.Handler.Cfg.ServRunAddr
+	}
+
+	builder := NewUserURLsResponseBuilder()
+	for short, full := range allURLs {
+		shortExp, err := url.JoinPath(baseURL, "/", short)
+		if err != nil {
+			continue
+		}
+
+		builder.AddURL(&pb.URLData{ShortUrl: shortExp,
+			OriginalUrl: full})
+	}
+
+	return builder.Build(), nil
+
+}
+
 func (s *Server) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb.URLShortenResponse, error) {
+	// originalURL := req.GetUrl()
+	// shortURL := s.generateShortURL(originalURL)
+
 	userID, ok := ctx.Value("userID").(string)
 	if !ok {
 		return nil, errors.New("user ID not found in context")
@@ -38,7 +67,11 @@ func (s *Server) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb
 		return nil, err
 	}
 
-	return &pb.URLShortenResponse{Result: fullShortURL}, nil
+	response := NewURLShortenResponseBuilder().
+		SetResult(fullShortURL).
+		Build()
+
+	return response, nil
 }
 
 func (s *Server) ExpandURL(ctx context.Context, req *pb.URLExpandRequest) (*pb.URLExpandResponse, error) {
@@ -47,34 +80,9 @@ func (s *Server) ExpandURL(ctx context.Context, req *pb.URLExpandRequest) (*pb.U
 		return nil, errors.New("URL not found")
 	}
 
-	return &pb.URLExpandResponse{Result: dataRow.URL}, nil
-}
-
-func (s *Server) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*pb.UserURLsResponse, error) {
-	userID, ok := ctx.Value("userID").(string)
-	if !ok {
-		return nil, errors.New("user ID not found in context")
+	response := &pb.URLExpandResponse{
+		Result: dataRow.URL,
 	}
 
-	allURLs := s.Handler.MapURL.GetAllURLsForUser(userID)
-	var urlData []*pb.URLData
-
-	baseURL := s.Handler.Cfg.AddrForURL
-	if baseURL == "" {
-		baseURL = "http://" + s.Handler.Cfg.ServRunAddr
-	}
-
-	for short, full := range allURLs {
-		shortExp, err := url.JoinPath(baseURL, "/", short)
-		if err != nil {
-			continue
-		}
-
-		urlData = append(urlData, &pb.URLData{
-			ShortUrl:    shortExp,
-			OriginalUrl: full,
-		})
-	}
-
-	return &pb.UserURLsResponse{Url: urlData}, nil
+	return response, nil
 }

@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"fmt"
 	"net"
 
 	pb "github.com/amfib87/go-musthave-shortener-tpl/proto"
@@ -22,7 +23,7 @@ func NewServer(handler *handler.Handler) *Server {
 func StartGRPCServer(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed net.Listen: %w", err)
 	}
 
 	s := grpc.NewServer()

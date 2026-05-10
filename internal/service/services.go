@@ -26,6 +26,7 @@ import (
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/logger"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/model"
 	"github.com/amfib87/go-musthave-shortener-tpl/internal/repository"
+	"github.com/golang-jwt/jwt/v4"
 	"go.uber.org/zap"
 )
 
@@ -294,4 +295,29 @@ func IsIPInSubnet(ipStr, subnetStr string) bool {
 	}
 
 	return subnet.Contains(ip)
+}
+
+type Claims struct {
+	UserID string `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+func GetUserID(str string) (id string, err error) {
+
+	token, err := jwt.ParseWithClaims(str, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(model.SecretKey), nil
+	})
+
+	if err == nil && token.Valid {
+		claims, ok := token.Claims.(*Claims)
+		if ok {
+			return claims.ID, nil
+		}
+
+		if claims.UserID == "" { // Кука есть, но id пуст => возвращаем 401 Unauthorized
+			return
+		}
+	}
+
+	return "", err
 }

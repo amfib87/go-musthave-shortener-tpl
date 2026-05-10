@@ -33,12 +33,18 @@ func Init(cfg *config.Cnfg, lg *logger.TLog, st service.URLStorage, au *audit.Au
 	r.chi.Use(h.GzipMiddleware)
 	r.chi.Use(h.TimeoutMiddleware)
 	r.chi.Use(h.AuthCookieMiddleware)
+	r.chi.Use(h.AuthCookieMiddleware)
 
 	// Регистрируем маршруты
 	r.chi.Get("/{id}", h.IDGetHandler)
 	r.chi.Get("/ping", h.GetPing)
 	r.chi.Get("/{api}/{user}/{urls}", h.GetAllURLsHandler)
-	r.chi.Get("/api/internal/stats", h.TrustedSubnetMiddleware(h.GetStats()))
+
+	r.chi.Route("/api/internal", func(r chi.Router) {
+		r.Use(h.TrustedSubnetMiddleware)
+
+		r.Get("/stats", h.GetStats)
+	})
 
 	r.chi.Post("/", h.PostURLHandler)
 	r.chi.Post("/{api}/{shorten}", h.PostURLJSONHandler)
